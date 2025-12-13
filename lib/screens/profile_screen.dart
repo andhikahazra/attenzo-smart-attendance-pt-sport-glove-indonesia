@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../state/auth_state.dart';
 import '../utils/app_colors.dart';
 import 'face_registration_screen.dart';
 import 'login_screen.dart';
@@ -8,6 +11,8 @@ class ProfileContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthState>();
+    final user = auth.user;
     return SafeArea(
       child: SingleChildScrollView(
         child: Padding(
@@ -44,7 +49,7 @@ class ProfileContent extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               Text(
-                'Jackie Jack',
+                user?.name ?? '—',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
@@ -67,7 +72,7 @@ class ProfileContent extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 20),
-              _buildInfoCard('Email', 'jackiejack@sportglove.id', Icons.email),
+              _buildInfoCard('Email', user?.email ?? '-', Icons.email),
               _buildInfoCard('Phone', '+62 812-3456-7890', Icons.phone),
               _buildInfoCard(
                 'Location',
@@ -106,6 +111,7 @@ class ProfileContent extends StatelessWidget {
                               onPressed: () {
                                 Navigator.of(context).pop(); // Close dialog
                                 // Navigate to login screen and clear all previous routes
+                                auth.logout();
                                 Navigator.of(context).pushAndRemoveUntil(
                                   MaterialPageRoute(
                                     builder: (context) => const LoginScreen(),

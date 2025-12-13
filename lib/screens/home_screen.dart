@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
-import '../widgets/bottom_nav_bar.dart';
+
+import 'package:provider/provider.dart';
+
+import '../state/auth_state.dart';
 import '../utils/app_colors.dart';
+import '../widgets/bottom_nav_bar.dart';
+import 'check_in_screen.dart';
 import 'profile_screen.dart';
 import 'riwayat_screen.dart';
 import 'work_screen.dart';
-import 'check_in_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,10 +21,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final user = context.watch<AuthState>().user;
     return Scaffold(
       backgroundColor: Colors.white,
       body: _currentIndex == 0
-          ? const HomeContent()
+          ? HomeContent(userName: user?.name)
           : _currentIndex == 1
           ? const RiwayatScreen()
           : _currentIndex == 2
@@ -39,7 +44,9 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class HomeContent extends StatelessWidget {
-  const HomeContent({super.key});
+  const HomeContent({super.key, this.userName});
+
+  final String? userName;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +66,7 @@ class HomeContent extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildTopBar(),
+                    _buildTopBar(userName),
                     const SizedBox(height: 24),
                     Text(
                       'Time to do what you do best',
@@ -70,16 +77,16 @@ class HomeContent extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      "What's up, Jack?",
-                      style: TextStyle(
+                    Text(
+                      "What's up, ${userName ?? 'there'}?",
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 28),
-                    _buildCheckInCard(context),
+                    _buildCheckInCard(context, userName),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -92,7 +99,7 @@ class HomeContent extends StatelessWidget {
     );
   }
 
-  Widget _buildTopBar() {
+  Widget _buildTopBar(String? name) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
@@ -127,7 +134,7 @@ class HomeContent extends StatelessWidget {
               radius: 22,
               backgroundColor: Colors.white,
               child: Text(
-                'J',
+                (name != null && name.isNotEmpty) ? name[0].toUpperCase() : 'U',
                 style: TextStyle(
                   color: AppColors.primary,
                   fontWeight: FontWeight.w700,
@@ -141,7 +148,7 @@ class HomeContent extends StatelessWidget {
     );
   }
 
-  Widget _buildCheckInCard(BuildContext context) {
+  Widget _buildCheckInCard(BuildContext context, String? name) {
     return SizedBox(
       height: 190,
       child: Stack(
@@ -210,25 +217,25 @@ class HomeContent extends StatelessWidget {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: const [
+                          children: [
                             Text(
-                              'Jackie Jack',
-                              style: TextStyle(
+                              name ?? '—',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
-                            SizedBox(height: 4),
-                            Text(
+                            const SizedBox(height: 4),
+                            const Text(
                               'Machine Division',
                               style: TextStyle(
                                 color: Color(0xFFCBD5F5),
                                 fontSize: 12,
                               ),
                             ),
-                            SizedBox(height: 6),
-                            Row(
+                            const SizedBox(height: 6),
+                            const Row(
                               children: [
                                 Icon(
                                   Icons.location_on_outlined,

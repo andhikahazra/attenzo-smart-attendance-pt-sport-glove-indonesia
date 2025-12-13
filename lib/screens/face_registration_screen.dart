@@ -3,19 +3,16 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 
+import '../state/auth_state.dart';
+import '../state/face_registration_state.dart';
 import '../utils/app_colors.dart';
 
-class FaceRegistrationScreen extends StatefulWidget {
+class FaceRegistrationScreen extends StatelessWidget {
   const FaceRegistrationScreen({super.key});
 
-  @override
-  State<FaceRegistrationScreen> createState() => _FaceRegistrationScreenState();
-}
-
-class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
-  final Map<String, XFile?> _captures = {};
-  final List<String> _angles = const [
+  static const List<String> _angles = [
     'Center',
     'Kanan',
     'Kiri',
@@ -25,31 +22,62 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return ChangeNotifierProvider(
+      create: (_) => FaceRegistrationState(angles: _angles),
+      child: Scaffold(
         backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
-        title: Text(
-          'Register Wajah',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          iconTheme: IconThemeData(color: AppColors.textPrimary),
+          title: Text(
+            'Register Wajah',
+            style: TextStyle(
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: _buildFaceRegistrationSection(context),
+        body: const SafeArea(
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(20),
+            child: _FaceRegistrationBody(),
+          ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildFaceRegistrationSection(BuildContext context) {
+class _FaceRegistrationBody extends StatefulWidget {
+  const _FaceRegistrationBody();
+
+  @override
+  State<_FaceRegistrationBody> createState() => _FaceRegistrationBodyState();
+}
+
+class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
+  @override
+  void initState() {
+    super.initState();
+    // Load existing face photos from server when screen opens.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final auth = context.read<AuthState>();
+      final token = auth.token;
+      if (token != null) {
+        await context.read<FaceRegistrationState>().loadExisting(token: token);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<FaceRegistrationState>();
+    return _buildFaceRegistrationSection(context, state);
+  }
+
+  Widget _buildFaceRegistrationSection(BuildContext context, FaceRegistrationState state) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -68,6 +96,21 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (state.isLoadingRemote)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: const [
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 10),
+                  Text('Memuat foto wajah dari server...'),
+                ],
+              ),
+            ),
           Text(
             'Registrasi Wajah',
             style: TextStyle(
@@ -85,15 +128,16 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
             ),
           ),
           const SizedBox(height: 14),
-          ..._angles.map(
+          ...state.angles.map(
             (angle) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _buildFaceCaptureRow(
                 context: context,
                 label: angle,
-                photo: _captures[angle],
-                onCapture: () => _handleCapture(angle),
-                onView: () => _handleView(angle),
+                photo: state.captures[angle],
+                remoteUrl: state.remoteUrls[angle],
+                onCapture: () => _handleCapture(context, angle, state),
+                onView: () => _handleView(context, angle, state),
               ),
             ),
           ),
@@ -101,24 +145,25 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Foto wajah tersimpan.')),
-                );
-              },
+              onPressed: state.isSaving ? null : () => _savePhotos(context, state),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
               icon: const Icon(Icons.save_outlined),
-              label: const Text(
-                'Simpan Foto Wajah',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
+              label: state.isSaving
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text(
+                      'Simpan Foto Wajah',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
             ),
           ),
           const SizedBox(height: 10),
@@ -154,6 +199,7 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
     required BuildContext context,
     required String label,
     required XFile? photo,
+    String? remoteUrl,
     required VoidCallback onCapture,
     required VoidCallback onView,
   }) {
@@ -180,7 +226,9 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
                           File(photo.path),
                           fit: BoxFit.cover,
                         )
-                      : const Icon(Icons.image_outlined, color: Colors.grey),
+                      : (remoteUrl != null
+                          ? Image.network(remoteUrl, fit: BoxFit.cover)
+                          : const Icon(Icons.image_outlined, color: Colors.grey)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -236,31 +284,28 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
     );
   }
 
-  Future<void> _handleCapture(String angle) async {
+  Future<void> _handleCapture(BuildContext context, String angle, FaceRegistrationState state) async {
     final granted = await _ensureCameraPermission();
     if (!granted) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Izin kamera diperlukan untuk mengambil foto.')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Izin kamera diperlukan untuk mengambil foto.')),
+      );
       return;
     }
 
-    final captured = await _openCameraPage(angle);
-    if (captured != null && mounted) {
-      setState(() {
-        _captures[angle] = captured;
-      });
+    final captured = await _openCameraPage(context, angle);
+    if (captured != null) {
+      state.setCapture(angle, captured);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Foto sudut $angle disimpan sementara.')),
       );
     }
   }
 
-  void _handleView(String angle) {
-    final photo = _captures[angle];
-    if (photo == null) {
+  void _handleView(BuildContext context, String angle, FaceRegistrationState state) {
+    final photo = state.captures[angle];
+    final remoteUrl = state.remoteUrls[angle];
+    if (photo == null && remoteUrl == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Belum ada foto untuk sudut $angle.')),
       );
@@ -282,10 +327,12 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
         ),
         content: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.file(
-            File(photo.path),
-            fit: BoxFit.contain,
-          ),
+          child: photo != null
+              ? Image.file(
+                  File(photo.path),
+                  fit: BoxFit.contain,
+                )
+              : Image.network(remoteUrl!, fit: BoxFit.contain),
         ),
         actions: [
           TextButton(
@@ -297,6 +344,31 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
     );
   }
 
+  Future<void> _savePhotos(BuildContext context, FaceRegistrationState state) async {
+    final auth = context.read<AuthState>();
+    final token = auth.token;
+    final user = auth.user;
+    if (token == null || user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesi tidak ditemukan, silakan login ulang.')),
+      );
+      return;
+    }
+
+    try {
+      await state.savePhotos(token: token, userId: user.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Foto wajah berhasil diunggah.')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menyimpan foto: $e')),
+      );
+    }
+  }
+
   Future<bool> _ensureCameraPermission() async {
     final status = await Permission.camera.status;
     if (status.isGranted) return true;
@@ -304,7 +376,7 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
     return result.isGranted;
   }
 
-  Future<XFile?> _openCameraPage(String angle) async {
+  Future<XFile?> _openCameraPage(BuildContext context, String angle) async {
     try {
       final result = await Navigator.of(context).push<XFile?>(
         MaterialPageRoute(
@@ -314,7 +386,7 @@ class _FaceRegistrationScreenState extends State<FaceRegistrationScreen> {
       );
       return result;
     } catch (e) {
-      if (mounted) {
+      if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Gagal membuka kamera: $e')),
         );
@@ -408,9 +480,9 @@ class _FullScreenCameraPageState extends State<_FullScreenCameraPage> {
                       final aspect = _controller!.value.aspectRatio; // width/height
 
                       // Scale camera to cover the square box without letterbox.
-                      final targetW = size;
-                      final targetH = size / aspect;
-                      final coverH = targetH < size ? size : targetH;
+                      final renderWidth = size;
+                      final renderHeight = renderWidth / aspect;
+                      final coverH = renderHeight < size ? size : renderHeight;
                       final coverW = coverH * aspect;
 
                       return Center(
