@@ -403,45 +403,71 @@ class _FullScreenCameraPageState extends State<_FullScreenCameraPage> {
                     builder: (context, constraints) {
                       final maxW = constraints.maxWidth;
                       final maxH = constraints.maxHeight;
-                      final aspect = _controller!.value.aspectRatio; // width / height
+                      final boxSize = maxW < maxH ? maxW : maxH * 0.72;
+                      final size = boxSize.clamp(240.0, maxW);
+                      final aspect = _controller!.value.aspectRatio; // width/height
 
-                      // Fit height fully, then crop width if needed to maintain aspect without letterbox.
-                      double targetH = maxH;
-                      double targetW = maxH * aspect;
-                      if (targetW < maxW) {
-                        // If still narrower than screen, fit width instead and crop height.
-                        targetW = maxW;
-                        targetH = maxW / aspect;
-                      }
+                      // Scale camera to cover the square box without letterbox.
+                      final targetW = size;
+                      final targetH = size / aspect;
+                      final coverH = targetH < size ? size : targetH;
+                      final coverW = coverH * aspect;
 
-                      return Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          SizedBox(
-                            width: maxW,
-                            height: maxH,
-                            child: DecoratedBox(
-                              decoration: const BoxDecoration(color: Colors.black),
-                            ),
-                          ),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: SizedBox(
-                              width: maxW,
-                              height: maxH,
-                              child: OverflowBox(
-                                alignment: Alignment.center,
-                                maxWidth: targetW,
-                                maxHeight: targetH,
-                                child: SizedBox(
-                                  width: targetW,
-                                  height: targetH,
-                                  child: CameraPreview(_controller!),
+                      return Center(
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(28),
+                              child: SizedBox(
+                                width: size,
+                                height: size,
+                                child: OverflowBox(
+                                  alignment: Alignment.center,
+                                  maxWidth: coverW,
+                                  maxHeight: coverH,
+                                  child: SizedBox(
+                                    width: coverW,
+                                    height: coverH,
+                                    child: CameraPreview(_controller!),
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                            // Overlay rings
+                            IgnorePointer(
+                              child: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  Container(
+                                    width: size * 0.88,
+                                    height: size * 0.88,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white.withOpacity(0.55), width: 3),
+                                    ),
+                                  ),
+                                  Container(
+                                    width: size * 0.68,
+                                    height: size * 0.68,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white.withOpacity(0.45), width: 2),
+                                    ),
+                                  ),
+                                  Container(
+                                    width: size * 0.50,
+                                    height: size * 0.50,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white.withOpacity(0.35), width: 2),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       );
                     },
                   );
