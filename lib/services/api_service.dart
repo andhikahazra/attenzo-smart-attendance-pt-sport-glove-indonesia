@@ -165,6 +165,33 @@ class ApiService {
     return AttendanceRecord.fromJson(data['data'] as Map<String, dynamic>);
   }
 
+  Future<List<AttendanceRecord>> getAttendanceRecords({
+    required String token,
+    required int userId,
+  }) async {
+    final response = await _client.get(
+      _uri('/api/attendance?user_id=$userId'),
+      headers: _headers(token: token),
+    );
+
+    _ensureSuccess(response);
+    final body = jsonDecode(response.body);
+
+    List<dynamic> rawList;
+    if (body is Map<String, dynamic>) {
+      rawList = (body['data'] as List?) ?? (body['attendance'] as List?) ?? <dynamic>[];
+    } else if (body is List) {
+      rawList = body;
+    } else {
+      rawList = <dynamic>[];
+    }
+
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(AttendanceRecord.fromJson)
+        .toList();
+  }
+
   void _ensureSuccess(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final message = _extractErrorMessage(response);
