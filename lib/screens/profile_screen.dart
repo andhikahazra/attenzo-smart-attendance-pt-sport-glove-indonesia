@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
+import 'face_registration_screen.dart';
 import 'login_screen.dart';
 
 class ProfileContent extends StatelessWidget {
@@ -55,7 +56,17 @@ class ProfileContent extends StatelessWidget {
                 'Machine Division',
                 style: TextStyle(fontSize: 16, color: AppColors.textSecondary),
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 16),
+              _buildRegisterShortcutCard(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const FaceRegistrationScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
               _buildInfoCard('Email', 'jackiejack@sportglove.id', Icons.email),
               _buildInfoCard('Phone', '+62 812-3456-7890', Icons.phone),
               _buildInfoCard(
@@ -136,6 +147,77 @@ class ProfileContent extends StatelessWidget {
       ),
     );
   }
+
+  static Widget _buildRegisterShortcutCard({required VoidCallback onTap}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        gradient: AppColors.cardGradient,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.face_retouching_natural, color: AppColors.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Register Wajah',
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Lengkapi 5 sudut wajah untuk presensi yang lebih akurat.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton(
+            onPressed: onTap,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text(
+              'Buka',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   static Widget _buildInfoCard(String title, String value, IconData icon) {
     return Container(
