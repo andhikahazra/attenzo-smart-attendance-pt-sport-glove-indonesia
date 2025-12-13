@@ -267,8 +267,6 @@ class _CheckInScreenState extends State<CheckInScreen>
 
       await _api.storeAttendance(
         token: token,
-        userId: user.id,
-        status: 'matched',
         type: type,
         attendanceDate: dateStr,
         attendanceTime: timeStr,

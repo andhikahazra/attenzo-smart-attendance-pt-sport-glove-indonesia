@@ -14,7 +14,8 @@ class ApiService {
 
   // static const String baseUrl = 'http://127.0.0.1:8000';
   // Base Url Via Real Device
-  static const String baseUrl = 'http://192.168.101.21:8000';
+  // static const String baseUrl = 'http://192.168.101.21:8000';
+  static const String baseUrl = 'http://10.113.22.213:8000';
   final http.Client _client;
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
@@ -76,24 +77,23 @@ class ApiService {
     return FacePhotosData.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
   }
 
-  /// Upload face photos as multipart. Server is expected to accept `photos[]` files.
-  Future<FacePhotosData> uploadFacePhotos({
+  /// Register/encode face photos (exactly 5) via /api/face-photos/encode using images[] multipart.
+  Future<Map<String, dynamic>> encodeFacePhotos({
     required String token,
-    required int userId,
     required List<File> photos,
   }) async {
-    final request = http.MultipartRequest('POST', _uri('/api/face-photos'))
-      ..headers.addAll(_headers(token: token))
-      ..fields['user_id'] = userId.toString();
+    final request = http.MultipartRequest('POST', _uri('/api/face-photos/encode'))
+      ..headers.addAll(_headers(token: token));
 
     for (final file in photos) {
-      request.files.add(await http.MultipartFile.fromPath('photos[]', file.path));
+      request.files.add(await http.MultipartFile.fromPath('images[]', file.path));
     }
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
     _ensureSuccess(response);
-    return FacePhotosData.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    final data = jsonDecode(response.body);
+    return data is Map<String, dynamic> ? data : <String, dynamic>{};
   }
 
   Future<void> uploadFacePhotoPaths({
@@ -136,52 +136,24 @@ class ApiService {
     return User.fromJson(data['user'] as Map<String, dynamic>);
   }
 
+  /// Send attendance with photo verification. Backend uses token user id; status handled server-side.
   Future<AttendanceRecord> storeAttendance({
     required String token,
-    required int userId,
-    required String status,
     required String type,
     required String attendanceDate,
     required String attendanceTime,
-    String? photoPath,
-    File? photoFile,
+    required File photoFile,
   }) async {
-    if (photoFile != null) {
-      final request = http.MultipartRequest('POST', _uri('/api/attendance'))
-        ..headers.addAll(_headers(token: token))
-        ..fields['user_id'] = userId.toString()
-        ..fields['status'] = status
-        ..fields['type'] = type
-        ..fields['attendance_date'] = attendanceDate
-        ..fields['attendance_time'] = attendanceTime;
+    final request = http.MultipartRequest('POST', _uri('/api/attendance'))
+      ..headers.addAll(_headers(token: token))
+      ..fields['type'] = type
+      ..fields['attendance_date'] = attendanceDate
+      ..fields['attendance_time'] = attendanceTime;
 
-      request.files.add(await http.MultipartFile.fromPath('photo', photoFile.path));
+    request.files.add(await http.MultipartFile.fromPath('photo', photoFile.path));
 
-      final streamed = await request.send();
-      final response = await http.Response.fromStream(streamed);
-      _ensureSuccess(response);
-      final data = jsonDecode(response.body);
-      final map = (data is Map<String, dynamic>)
-          ? (data['data'] as Map<String, dynamic>? ?? data)
-          : <String, dynamic>{};
-      return AttendanceRecord.fromJson(map);
-    }
-
-    final response = await _client.post(
-      _uri('/api/attendance'),
-      headers: _headers(
-        token: token,
-        extra: {HttpHeaders.contentTypeHeader: 'application/json'},
-      ),
-      body: jsonEncode({
-        'user_id': userId,
-        'status': status,
-        'type': type,
-        'attendance_date': attendanceDate,
-        'attendance_time': attendanceTime,
-        if (photoPath != null) 'photo_path': photoPath,
-      }),
-    );
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
     _ensureSuccess(response);
     final data = jsonDecode(response.body);
     final map = (data is Map<String, dynamic>)
@@ -192,10 +164,9 @@ class ApiService {
 
   Future<List<AttendanceRecord>> getAttendanceRecords({
     required String token,
-    required int userId,
   }) async {
     final response = await _client.get(
-      _uri('/api/attendance?user_id=$userId'),
+      _uri('/api/attendance'),
       headers: _headers(token: token),
     );
 

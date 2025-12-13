@@ -23,12 +23,14 @@ class FaceRegistrationState extends ChangeNotifier {
   final Map<String, XFile?> _captures = {};
   final Map<String, String> _remoteUrls = {};
   bool _isSaving = false;
+  bool _isVerifying = false;
   bool _isLoadingRemote = false;
   String? _error;
 
   Map<String, XFile?> get captures => _captures;
   Map<String, String> get remoteUrls => _remoteUrls;
   bool get isSaving => _isSaving;
+  bool get isVerifying => _isVerifying;
   bool get isLoadingRemote => _isLoadingRemote;
   String? get error => _error;
   bool get hasLocalCapture => _captures.values.any((f) => f != null);
@@ -84,7 +86,7 @@ class FaceRegistrationState extends ChangeNotifier {
     return raw;
   }
 
-  Future<void> savePhotos({required String token, required int userId}) async {
+  Future<void> savePhotos({required String token}) async {
     if (!allLocalComplete) {
       throw const FormatException('Harus mengambil 5 foto sebelum menyimpan.');
     }
@@ -98,7 +100,7 @@ class FaceRegistrationState extends ChangeNotifier {
     _setSaving(true);
     _error = null;
     try {
-      await _api.uploadFacePhotos(token: token, userId: userId, photos: files);
+      await _api.encodeFacePhotos(token: token, photos: files);
     } catch (e) {
       _error = e.toString();
       rethrow;
@@ -107,8 +109,36 @@ class FaceRegistrationState extends ChangeNotifier {
     }
   }
 
+  Future<void> verifyLocalSet({required String token}) async {
+    if (!allLocalComplete) {
+      throw const FormatException('Lengkapi 5 foto sebelum verifikasi.');
+    }
+
+    final files = angles
+        .map((angle) => _captures[angle])
+        .whereType<XFile>()
+        .map((x) => File(x.path))
+        .toList(growable: false);
+
+    _setVerifying(true);
+    _error = null;
+    try {
+      await _api.encodeFacePhotos(token: token, photos: files);
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _setVerifying(false);
+    }
+  }
+
   void _setSaving(bool value) {
     _isSaving = value;
+    notifyListeners();
+  }
+
+  void _setVerifying(bool value) {
+    _isVerifying = value;
     notifyListeners();
   }
 }

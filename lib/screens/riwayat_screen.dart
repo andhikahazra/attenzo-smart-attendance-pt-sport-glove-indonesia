@@ -51,7 +51,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
       throw const HttpException('Anda perlu login ulang');
     }
 
-    return _api.getAttendanceRecords(token: token, userId: user.id);
+    return _api.getAttendanceRecords(token: token);
   }
 
   Future<void> _refresh() async {
