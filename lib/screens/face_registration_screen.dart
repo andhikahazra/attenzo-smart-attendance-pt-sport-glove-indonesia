@@ -166,35 +166,7 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : const Text(
-                      'Simpan Foto Wajah',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: state.isVerifying || !state.isComplete
-                  ? null
-                  : () => _verifyPhotos(context, state),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              icon: const Icon(Icons.verified_user_outlined),
-              label: state.isVerifying
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text(
-                      'Verifikasi Wajah',
+                      'Simpan & Verifikasi Wajah',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
             ),
@@ -373,42 +345,12 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
       await state.savePhotos(token: token);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Foto wajah berhasil diunggah.')),
+        const SnackBar(content: Text('Foto wajah berhasil disimpan & diverifikasi.')),
       );
     } catch (e) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal menyimpan foto: $e')),
-      );
-    }
-  }
-
-  Future<void> _verifyPhotos(BuildContext context, FaceRegistrationState state) async {
-    final auth = context.read<AuthState>();
-    final token = auth.token;
-    if (!state.isComplete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lengkapi 5 foto sebelum verifikasi.')),
-      );
-      return;
-    }
-    if (token == null || auth.user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Sesi tidak ditemukan, silakan login ulang.')),
-      );
-      return;
-    }
-
-    try {
-      await state.verifyLocalSet(token: token);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Verifikasi wajah berhasil.')),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Verifikasi gagal: $e')),
       );
     }
   }
