@@ -14,8 +14,8 @@ class ApiService {
 
   // static const String baseUrl = 'http://127.0.0.1:8000';
   // Base Url Via Real Device
-  // static const String baseUrl = 'http://192.168.101.21:8000';
-  static const String baseUrl = 'http://10.113.22.213:8000';
+  static const String baseUrl = 'http://192.168.101.21:8000';
+  // static const String baseUrl = 'http://10.113.22.213:8000';
   final http.Client _client;
 
   Uri _uri(String path) => Uri.parse('$baseUrl$path');
