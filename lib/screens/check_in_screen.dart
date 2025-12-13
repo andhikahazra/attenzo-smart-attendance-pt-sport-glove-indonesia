@@ -1,6 +1,12 @@
+import 'dart:io';
+
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
+
+import '../services/api_service.dart';
+import '../state/auth_state.dart';
 
 class CheckInScreen extends StatefulWidget {
   const CheckInScreen({super.key});
@@ -17,6 +23,8 @@ class _CheckInScreenState extends State<CheckInScreen>
   bool _permissionPermanentlyDenied = false;
   bool _isCheckedIn = false;
   String _displayTime = '08:55 AM';
+  bool _isPosting = false;
+  final ApiService _api = ApiService();
 
   @override
   void initState() {
@@ -28,6 +36,7 @@ class _CheckInScreenState extends State<CheckInScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _api.dispose();
     _cameraController?.dispose();
     super.dispose();
   }
@@ -204,6 +213,7 @@ class _CheckInScreenState extends State<CheckInScreen>
                             onActionTap: _handleCheckAction,
                             displayTime: _displayTime,
                             isCheckedIn: _isCheckedIn,
+                            isLoading: _isPosting,
                           ),
                           const SizedBox(height: 20),
                           const _LocationCard(),
@@ -221,18 +231,80 @@ class _CheckInScreenState extends State<CheckInScreen>
     );
   }
 
-  void _handleCheckAction() {
-    if (!mounted) return;
-    final wasCheckedIn = _isCheckedIn;
-    final actionLabel = wasCheckedIn ? 'Check-Out' : 'Check-In';
-    final formattedTime = TimeOfDay.now().format(context);
+  Future<void> _handleCheckAction() async {
+    if (!mounted || _isPosting) return;
+
+    final controller = _cameraController;
+    if (controller == null || !controller.value.isInitialized) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kamera belum siap untuk mengambil foto.')),
+      );
+      return;
+    }
+
+    final auth = context.read<AuthState>();
+    final token = auth.token;
+    final user = auth.user;
+    if (token == null || user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Silakan login ulang untuk absen.')),
+      );
+      return;
+    }
+
+    final type = _isCheckedIn ? 'check_out' : 'check_in';
+    final now = DateTime.now();
+    final dateStr = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
 
     setState(() {
-      _isCheckedIn = !wasCheckedIn;
-      _displayTime = formattedTime;
+      _isPosting = true;
     });
 
-    _showSuccessDialog(actionLabel, formattedTime);
+    try {
+      final picture = await controller.takePicture();
+      final file = File(picture.path);
+
+      await _api.storeAttendance(
+        token: token,
+        userId: user.id,
+        status: 'matched',
+        type: type,
+        attendanceDate: dateStr,
+        attendanceTime: timeStr,
+        photoFile: file,
+      );
+
+      final formattedTime = TimeOfDay.now().format(context);
+      if (!mounted) return;
+      setState(() {
+        _isCheckedIn = !_isCheckedIn;
+        _displayTime = formattedTime;
+      });
+
+      _showSuccessDialog(type == 'check_in' ? 'Check-In' : 'Check-Out', formattedTime);
+    } on CameraException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengambil foto: ${e.description ?? e.code}')),
+      );
+    } on HttpException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal kirim absen: ${e.message}')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal kirim absen: ${e.toString()}')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPosting = false;
+        });
+      }
+    }
   }
 
   void _showSuccessDialog(String actionLabel, String formattedTime) {
@@ -412,6 +484,7 @@ class _ScanCard extends StatelessWidget {
     required this.onActionTap,
     required this.displayTime,
     required this.isCheckedIn,
+    required this.isLoading,
   });
 
   final CameraController? cameraController;
@@ -420,9 +493,10 @@ class _ScanCard extends StatelessWidget {
   final bool permissionPermanentlyDenied;
   final Future<void> Function() onOpenSettings;
   final Future<void> Function() onRetry;
-  final VoidCallback onActionTap;
+  final Future<void> Function() onActionTap;
   final String displayTime;
   final bool isCheckedIn;
+  final bool isLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -514,6 +588,7 @@ class _ScanCard extends StatelessWidget {
           _CheckActionButton(
             isCheckedIn: isCheckedIn,
             time: displayTime,
+            isLoading: isLoading,
             onTap: onActionTap,
           ),
         ],
@@ -687,12 +762,14 @@ class _CheckActionButton extends StatelessWidget {
   const _CheckActionButton({
     required this.isCheckedIn,
     required this.time,
+    required this.isLoading,
     this.onTap,
   });
 
   final bool isCheckedIn;
   final String time;
-  final VoidCallback? onTap;
+  final bool isLoading;
+  final Future<void> Function()? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -702,7 +779,7 @@ class _CheckActionButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(24),
         splashColor: const Color(0xFF6366F1).withOpacity(0.12),
         highlightColor: Colors.transparent,
-        onTap: onTap,
+        onTap: isLoading ? null : () => onTap?.call(),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
           decoration: BoxDecoration(
@@ -744,7 +821,11 @@ class _CheckActionButton extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isCheckedIn ? 'Tap to Check-Out' : 'Tap to Check-In',
+                    isLoading
+                        ? 'Mengirim absensi...'
+                        : isCheckedIn
+                            ? 'Tap to Check-Out'
+                            : 'Tap to Check-In',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -755,20 +836,37 @@ class _CheckActionButton extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(
-                        Icons.access_time,
-                        size: 15,
-                        color: Color(0xFF4C51BF),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        time,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF111827),
+                      if (isLoading) ...[
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Uploading...',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                      ] else ...[
+                        const Icon(
+                          Icons.access_time,
+                          size: 15,
+                          color: Color(0xFF4C51BF),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          time,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111827),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],

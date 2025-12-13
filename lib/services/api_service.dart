@@ -144,7 +144,29 @@ class ApiService {
     required String attendanceDate,
     required String attendanceTime,
     String? photoPath,
+    File? photoFile,
   }) async {
+    if (photoFile != null) {
+      final request = http.MultipartRequest('POST', _uri('/api/attendance'))
+        ..headers.addAll(_headers(token: token))
+        ..fields['user_id'] = userId.toString()
+        ..fields['status'] = status
+        ..fields['type'] = type
+        ..fields['attendance_date'] = attendanceDate
+        ..fields['attendance_time'] = attendanceTime;
+
+      request.files.add(await http.MultipartFile.fromPath('photo', photoFile.path));
+
+      final streamed = await request.send();
+      final response = await http.Response.fromStream(streamed);
+      _ensureSuccess(response);
+      final data = jsonDecode(response.body);
+      final map = (data is Map<String, dynamic>)
+          ? (data['data'] as Map<String, dynamic>? ?? data)
+          : <String, dynamic>{};
+      return AttendanceRecord.fromJson(map);
+    }
+
     final response = await _client.post(
       _uri('/api/attendance'),
       headers: _headers(
@@ -161,8 +183,11 @@ class ApiService {
       }),
     );
     _ensureSuccess(response);
-    final data = jsonDecode(response.body) as Map<String, dynamic>;
-    return AttendanceRecord.fromJson(data['data'] as Map<String, dynamic>);
+    final data = jsonDecode(response.body);
+    final map = (data is Map<String, dynamic>)
+        ? (data['data'] as Map<String, dynamic>? ?? data)
+        : <String, dynamic>{};
+    return AttendanceRecord.fromJson(map);
   }
 
   Future<List<AttendanceRecord>> getAttendanceRecords({
