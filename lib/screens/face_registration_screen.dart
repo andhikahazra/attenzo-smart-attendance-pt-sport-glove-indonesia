@@ -145,9 +145,14 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: state.isSaving ? null : () => _savePhotos(context, state),
+              onPressed: state.isSaving
+                  ? null
+                  : (state.isComplete ? () => _savePhotos(context, state) : null),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: AppColors.primary.withOpacity(0.25),
+                disabledForegroundColor: Colors.white.withOpacity(0.6),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -348,6 +353,12 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
     final auth = context.read<AuthState>();
     final token = auth.token;
     final user = auth.user;
+    if (!state.isComplete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Lengkapi 5 foto sebelum menyimpan.')),
+      );
+      return;
+    }
     if (token == null || user == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Sesi tidak ditemukan, silakan login ulang.')),

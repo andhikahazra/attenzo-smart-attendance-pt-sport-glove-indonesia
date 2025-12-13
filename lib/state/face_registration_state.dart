@@ -31,7 +31,10 @@ class FaceRegistrationState extends ChangeNotifier {
   bool get isSaving => _isSaving;
   bool get isLoadingRemote => _isLoadingRemote;
   String? get error => _error;
-  bool get isComplete => angles.every((angle) => _captures[angle] != null);
+  bool get hasLocalCapture => _captures.values.any((f) => f != null);
+  bool get allLocalComplete => angles.every((angle) => _captures[angle] != null);
+  bool get hasRemoteSet => angles.every((angle) => (_remoteUrls[angle] ?? '').isNotEmpty);
+  bool get isComplete => allLocalComplete;
 
   void setCapture(String angle, XFile file) {
     _captures[angle] = file;
@@ -82,9 +85,10 @@ class FaceRegistrationState extends ChangeNotifier {
   }
 
   Future<void> savePhotos({required String token, required int userId}) async {
-    if (!isComplete) {
-      throw const FormatException('Lengkapi 5 foto sebelum menyimpan.');
+    if (!allLocalComplete) {
+      throw const FormatException('Harus mengambil 5 foto sebelum menyimpan.');
     }
+
     final files = angles
         .map((angle) => _captures[angle])
         .whereType<XFile>()
