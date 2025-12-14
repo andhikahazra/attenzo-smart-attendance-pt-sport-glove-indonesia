@@ -341,14 +341,97 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
       return;
     }
 
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFEEF2FF), Color(0xFFD1D5FA)],
+              ),
+              borderRadius: BorderRadius.circular(32),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.13),
+                  blurRadius: 44,
+                  offset: const Offset(0, 18),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withOpacity(0.18),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Mohon tunggu',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF3730A3),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Proses simpan & verifikasi wajah sedang berlangsung...\nJangan tutup aplikasi atau keluar dari halaman ini.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF6366F1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
     try {
       await state.savePhotos(token: token);
       if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Foto wajah berhasil disimpan & diverifikasi.')),
       );
     } catch (e) {
       if (!context.mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gagal menyimpan foto: $e')),
       );
