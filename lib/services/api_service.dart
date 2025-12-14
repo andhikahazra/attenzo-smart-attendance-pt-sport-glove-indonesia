@@ -191,8 +191,27 @@ class ApiService {
   void _ensureSuccess(http.Response response) {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       final message = _extractErrorMessage(response);
+      // Custom handling for face service error
+      if (message.contains('Face could not be detected')) {
+        throw HttpException(message, uri: response.request?.url);
+      }
+      if (message.contains('face service error') || message.contains('Face service error')) {
+        // Try to extract details from response
+        try {
+          final body = jsonDecode(response.body);
+          if (body is Map<String, dynamic> && body['details'] != null) {
+            final details = body['details'];
+            if (details is String && details.contains('Face could not be detected')) {
+              throw HttpException(details, uri: response.request?.url);
+            }
+            if (details is Map && details['message'] is String) {
+              throw HttpException(details['message'], uri: response.request?.url);
+            }
+          }
+        } catch (_) {}
+      }
       throw HttpException(
-        'Request failed (${response.statusCode}): $message',
+        message,
         uri: response.request?.url,
       );
     }

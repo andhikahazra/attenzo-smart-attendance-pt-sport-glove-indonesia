@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 
 import '../services/api_service.dart';
 import '../state/auth_state.dart';
@@ -22,15 +23,20 @@ class _CheckInScreenState extends State<CheckInScreen>
   String? _cameraError;
   bool _permissionPermanentlyDenied = false;
   bool _isCheckedIn = false;
-  String _displayTime = '08:55 AM';
+  String _displayTime = '';
   bool _isPosting = false;
   final ApiService _api = ApiService();
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateTime();
+      _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
+    });
   }
 
   @override
@@ -38,7 +44,15 @@ class _CheckInScreenState extends State<CheckInScreen>
     WidgetsBinding.instance.removeObserver(this);
     _api.dispose();
     _cameraController?.dispose();
+    _timer?.cancel();
     super.dispose();
+  }
+  void _updateTime() {
+    final now = DateTime.now();
+    final formatted = TimeOfDay.fromDateTime(now).format(context);
+    setState(() {
+      _displayTime = formatted;
+    });
   }
 
   @override
@@ -233,12 +247,13 @@ class _CheckInScreenState extends State<CheckInScreen>
 
   Future<void> _handleCheckAction() async {
     if (!mounted || _isPosting) return;
+    setState(() {
+      _isPosting = true;
+    });
 
     final controller = _cameraController;
     if (controller == null || !controller.value.isInitialized) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Kamera belum siap untuk mengambil foto.')),
-      );
+      _showStatusDialog('Kamera belum siap untuk mengambil foto.', isError: true);
       return;
     }
 
@@ -246,9 +261,7 @@ class _CheckInScreenState extends State<CheckInScreen>
     final token = auth.token;
     final user = auth.user;
     if (token == null || user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Silakan login ulang untuk absen.')),
-      );
+      _showStatusDialog('Silakan login ulang untuk absen.', isError: true);
       return;
     }
 
@@ -257,9 +270,88 @@ class _CheckInScreenState extends State<CheckInScreen>
     final dateStr = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
 
-    setState(() {
-      _isPosting = true;
-    });
+
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 32),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFEEF2FF), Color(0xFFD1D5FA)],
+              ),
+              borderRadius: BorderRadius.circular(32),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.13),
+                  blurRadius: 44,
+                  offset: const Offset(0, 18),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 64,
+                  height: 64,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF6366F1), Color(0xFF818CF8)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withOpacity(0.18),
+                        blurRadius: 18,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(14),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 3.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Mohon tunggu',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF3730A3),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Proses verifikasi wajah sedang berlangsung...\nJangan tutup aplikasi atau keluar dari halaman ini.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF6366F1),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
 
     try {
       final picture = await controller.takePicture();
@@ -280,22 +372,36 @@ class _CheckInScreenState extends State<CheckInScreen>
         _displayTime = formattedTime;
       });
 
+      Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
       _showSuccessDialog(type == 'check_in' ? 'Check-In' : 'Check-Out', formattedTime);
     } on CameraException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mengambil foto: ${e.description ?? e.code}')),
-      );
+      Navigator.of(context, rootNavigator: true).pop();
+      _showStatusDialog('Gagal mengambil foto: ${e.description ?? e.code}', isError: true);
     } on HttpException catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal kirim absen: ${e.message}')),
-      );
+      Navigator.of(context, rootNavigator: true).pop();
+      final msg = e.message;
+      if (msg != null && msg.contains('Face could not be detected')) {
+        _showStatusDialog(
+          'Wajah tidak terdeteksi pada foto yang diambil.\n\nPastikan wajah Anda jelas terlihat di dalam frame dan tidak terhalang. Silakan coba lagi.',
+          isError: true,
+        );
+      } else {
+        _showStatusDialog('Gagal kirim absen: $msg', isError: true);
+      }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal kirim absen: ${e.toString()}')),
-      );
+      Navigator.of(context, rootNavigator: true).pop();
+      final msg = e.toString();
+      if (msg.contains('Face could not be detected')) {
+        _showStatusDialog(
+          'Wajah tidak terdeteksi pada foto yang diambil.\n\nPastikan wajah Anda jelas terlihat di dalam frame dan tidak terhalang. Silakan coba lagi.',
+          isError: true,
+        );
+      } else {
+        _showStatusDialog('Gagal kirim absen: $msg', isError: true);
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -303,6 +409,71 @@ class _CheckInScreenState extends State<CheckInScreen>
         });
       }
     }
+  }
+
+  void _showStatusDialog(String message, {bool isError = false}) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 40,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isError ? Icons.error_outline_rounded : Icons.info_outline_rounded,
+                  size: 48,
+                  color: isError ? const Color(0xFFEF4444) : const Color(0xFF6366F1),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF111827)),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isError ? const Color(0xFFEF4444) : const Color(0xFF6366F1),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Tutup',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showSuccessDialog(String actionLabel, String formattedTime) {
@@ -587,7 +758,8 @@ class _ScanCard extends StatelessWidget {
             isCheckedIn: isCheckedIn,
             time: displayTime,
             isLoading: isLoading,
-            onTap: onActionTap,
+            onTap: isLoading ? null : onActionTap,
+            forceDisable: isLoading,
           ),
         ],
       ),
@@ -762,12 +934,14 @@ class _CheckActionButton extends StatelessWidget {
     required this.time,
     required this.isLoading,
     this.onTap,
+    this.forceDisable = false,
   });
 
   final bool isCheckedIn;
   final String time;
   final bool isLoading;
   final Future<void> Function()? onTap;
+  final bool forceDisable;
 
   @override
   Widget build(BuildContext context) {
@@ -775,81 +949,65 @@ class _CheckActionButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        splashColor: const Color(0xFF6366F1).withOpacity(0.12),
+        splashColor: forceDisable ? Colors.transparent : const Color(0xFF6366F1).withOpacity(0.12),
         highlightColor: Colors.transparent,
-        onTap: isLoading ? null : () => onTap?.call(),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.06),
-                blurRadius: 20,
-                offset: const Offset(0, 14),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color:
-                      (isCheckedIn
-                              ? const Color(0xFF22C55E)
-                              : const Color(0xFF6366F1))
-                          .withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(20),
+        onTap: forceDisable ? null : () => onTap?.call(),
+        child: Opacity(
+          opacity: forceDisable ? 0.6 : 1.0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 20,
+                  offset: const Offset(0, 14),
                 ),
-                child: Icon(
-                  isCheckedIn ? Icons.logout_rounded : Icons.login_rounded,
-                  size: 20,
-                  color: isCheckedIn
-                      ? const Color(0xFF15803D)
-                      : const Color(0xFF4C51BF),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isLoading
-                        ? 'Mengirim absensi...'
-                        : isCheckedIn
-                            ? 'Tap to Check-Out'
-                            : 'Tap to Check-In',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF6B7280),
-                    ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color:
+                        (isCheckedIn
+                                ? const Color(0xFF22C55E)
+                                : const Color(0xFF6366F1))
+                            .withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isLoading) ...[
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Uploading...',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF111827),
-                          ),
-                        ),
-                      ] else ...[
+                  child: Icon(
+                    isCheckedIn ? Icons.logout_rounded : Icons.login_rounded,
+                    size: 20,
+                    color: isCheckedIn
+                        ? const Color(0xFF15803D)
+                        : const Color(0xFF4C51BF),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isCheckedIn
+                          ? 'Tap to Check-Out'
+                          : 'Tap to Absen',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF6B7280),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                         const Icon(
                           Icons.access_time,
                           size: 15,
@@ -865,11 +1023,11 @@ class _CheckActionButton extends StatelessWidget {
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                ],
-              ),
-            ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
