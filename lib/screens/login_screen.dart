@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../state/auth_state.dart';
 import 'home_screen.dart';
+import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -553,7 +554,12 @@ class _SignInPageState extends State<SignInPage> {
                       style: TextStyle(color: Color(0xFF6B7280)),
                     ),
                     TextButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                        );
+                      },
                       child: const Text(
                         'Daftar',
                         style: TextStyle(
