@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math';
 
 import 'login_screen.dart';
-import '../utils/app_colors.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -67,12 +65,12 @@ class _SplashScreenState extends State<SplashScreen>
             Positioned(
               top: -120,
               right: -60,
-              child: _blurCircle(220, const Color(0xFF111827).withOpacity(0.22)),
+              child: _blurCircle(220, const Color(0xFF111827).withValues(alpha: 0.22)),
             ),
             Positioned(
               bottom: -140,
               left: -40,
-              child: _blurCircle(260, Colors.white.withOpacity(0.10)),
+              child: _blurCircle(260, Colors.white.withValues(alpha: 0.10)),
             ),
             Center(
               child: FadeTransition(
@@ -98,12 +96,12 @@ class _SplashScreenState extends State<SplashScreen>
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.12),
+                              color: Colors.black.withValues(alpha: 0.12),
                               blurRadius: 28,
                               offset: const Offset(0, 14),
                             ),
                           ],
-                          border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
                         ),
                         child: Stack(
                           alignment: Alignment.center,
@@ -130,7 +128,7 @@ class _SplashScreenState extends State<SplashScreen>
                       Text(
                         'PT. Sport Glove Indonesia',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.85),
+                          color: Colors.white.withValues(alpha: 0.85),
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
@@ -139,7 +137,7 @@ class _SplashScreenState extends State<SplashScreen>
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.16),
+                          color: Colors.white.withValues(alpha: 0.16),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Row(

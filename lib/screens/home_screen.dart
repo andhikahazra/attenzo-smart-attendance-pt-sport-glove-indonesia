@@ -71,7 +71,7 @@ class HomeContent extends StatelessWidget {
                     Text(
                       'Time to do what you do best',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.65),
+                        color: Colors.white.withValues(alpha: 0.65),
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
@@ -106,7 +106,7 @@ class HomeContent extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.08),
+            color: Colors.white.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(16),
           ),
           child: const Icon(
@@ -120,7 +120,7 @@ class HomeContent extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: const Icon(
@@ -161,7 +161,7 @@ class HomeContent extends StatelessWidget {
             child: Container(
               height: 120,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(28),
               ),
             ),
@@ -173,7 +173,7 @@ class HomeContent extends StatelessWidget {
             child: Container(
               height: 130,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.12),
+                color: Colors.white.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(26),
               ),
             ),
@@ -189,7 +189,7 @@ class HomeContent extends StatelessWidget {
                 borderRadius: BorderRadius.circular(26),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
+                    color: Colors.black.withValues(alpha: 0.25),
                     blurRadius: 20,
                     offset: const Offset(0, 12),
                   ),
@@ -258,7 +258,7 @@ class HomeContent extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  Divider(color: Colors.white.withOpacity(0.2), height: 1),
+                  Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -312,7 +312,7 @@ class HomeContent extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 18,
             offset: const Offset(0, -6),
           ),
@@ -611,7 +611,7 @@ class HomeContent extends StatelessWidget {
         border: Border.all(color: const Color(0xFFE8ECF5)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1E293B).withOpacity(0.04),
+            color: const Color(0xFF1E293B).withValues(alpha: 0.04),
             blurRadius: 14,
             offset: const Offset(0, 10),
           ),

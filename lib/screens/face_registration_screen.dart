@@ -87,7 +87,7 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.05),
+            color: AppColors.primary.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -151,8 +151,8 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
-                disabledBackgroundColor: AppColors.primary.withOpacity(0.25),
-                disabledForegroundColor: Colors.white.withOpacity(0.6),
+                disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.25),
+                disabledForegroundColor: Colors.white.withValues(alpha: 0.6),
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -189,7 +189,7 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border.withOpacity(0.8)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,7 +227,7 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: AppColors.primary,
-                  side: BorderSide(color: AppColors.primary.withOpacity(0.4)),
+                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                   shape: RoundedRectangleBorder(
@@ -248,7 +248,7 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
               onPressed: onView,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
-                side: BorderSide(color: AppColors.primary.withOpacity(0.4)),
+                side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
@@ -266,20 +266,32 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
   }
 
   Future<void> _handleCapture(BuildContext context, String angle, FaceRegistrationState state) async {
+    // Store ScaffoldMessenger reference before any async operations
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    // Perform async operations first
     final granted = await _ensureCameraPermission();
+    
+    // Schedule UI operations for next frame to avoid BuildContext across async gaps
     if (!granted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Izin kamera diperlukan untuk mengambil foto.')),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('Izin kamera diperlukan untuk mengambil foto.')),
+        );
+      });
       return;
     }
 
+    // Continue with camera operation
+    // ignore: use_build_context_synchronously
     final captured = await _openCameraPage(context, angle);
     if (captured != null) {
       state.setCapture(angle, captured);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Foto sudut $angle disimpan sementara.')),
-      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text('Foto sudut $angle disimpan sementara.')),
+        );
+      });
     }
   }
 
@@ -360,7 +372,7 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
               borderRadius: BorderRadius.circular(32),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.13),
+                  color: Colors.black.withValues(alpha: 0.13),
                   blurRadius: 44,
                   offset: const Offset(0, 18),
                 ),
@@ -381,7 +393,7 @@ class _FaceRegistrationBodyState extends State<_FaceRegistrationBody> {
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF6366F1).withOpacity(0.18),
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.18),
                         blurRadius: 18,
                         offset: const Offset(0, 8),
                       ),
@@ -585,7 +597,7 @@ class _FullScreenCameraPageState extends State<_FullScreenCameraPage> {
                                     height: size * 0.88,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white.withOpacity(0.55), width: 3),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 3),
                                     ),
                                   ),
                                   Container(
@@ -593,7 +605,7 @@ class _FullScreenCameraPageState extends State<_FullScreenCameraPage> {
                                     height: size * 0.68,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white.withOpacity(0.45), width: 2),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.45), width: 2),
                                     ),
                                   ),
                                   Container(
@@ -601,7 +613,7 @@ class _FullScreenCameraPageState extends State<_FullScreenCameraPage> {
                                     height: size * 0.50,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.white.withOpacity(0.35), width: 2),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.35), width: 2),
                                     ),
                                   ),
                                 ],

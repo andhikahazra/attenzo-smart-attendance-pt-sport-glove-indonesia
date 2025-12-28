@@ -35,7 +35,6 @@ class MyApp extends StatelessWidget {
             primary: AppColors.primary,
             secondary: AppColors.secondary,
             surface: AppColors.surface,
-            background: AppColors.background,
           ),
           useMaterial3: true,
           cardTheme: CardThemeData(

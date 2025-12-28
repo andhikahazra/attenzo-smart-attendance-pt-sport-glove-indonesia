@@ -22,46 +22,36 @@ class WorkScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
 
-              // Quick Actions
+              // Attendance Chart
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [const Color(0xFF1E3A4C), const Color(0xFF2A5570)],
-                  ),
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: Colors.grey.shade300),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Quick Actions',
+                      'Grafik Kehadiran Minggu Ini',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
+                        color: Color(0xFF1E3A4C),
                       ),
                     ),
                     const SizedBox(height: 20),
                     Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        Expanded(
-                          child: _buildQuickActionButton(
-                            icon: Icons.login,
-                            label: 'Check In',
-                            color: Colors.green,
-                            onTap: () {},
-                          ),
-                        ),
-                        const SizedBox(width: 15),
-                        Expanded(
-                          child: _buildQuickActionButton(
-                            icon: Icons.logout,
-                            label: 'Check Out',
-                            color: Colors.orange,
-                            onTap: () {},
-                          ),
-                        ),
+                        _buildDayBox('Sen', 8 > 0),
+                        _buildDayBox('Sel', 7 > 0),
+                        _buildDayBox('Rab', 9 > 0),
+                        _buildDayBox('Kam', 6 > 0),
+                        _buildDayBox('Jum', 8 > 0),
+                        _buildDayBox('Sab', 0 > 0),
+                        _buildDayBox('Min', 8 > 0),
                       ],
                     ),
                   ],
@@ -69,6 +59,64 @@ class WorkScreen extends StatelessWidget {
               ),
 
               const SizedBox(height: 25),
+
+              // Attendance Statistics
+              const Text(
+                'Statistik Kehadiran',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1E3A4C),
+                ),
+              ),
+              const SizedBox(height: 15),
+
+              // Statistics Cards
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      title: 'Total Masuk',
+                      value: '22',
+                      icon: Icons.check_circle,
+                      color: Colors.green,
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: _buildStatCard(
+                      title: 'Total Telat',
+                      value: '3',
+                      icon: Icons.access_time,
+                      color: Colors.orange,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 15),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildStatCard(
+                      title: 'Hari Kerja',
+                      value: '25',
+                      icon: Icons.calendar_today,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: _buildStatCard(
+                      title: 'Tidak Masuk',
+                      value: '0',
+                      icon: Icons.cancel,
+                      color: Colors.red,
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 20),
 
               // Leave Request Section
               const Text(
@@ -148,38 +196,6 @@ class WorkScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildQuickActionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 15),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildMenuCard({
     required IconData icon,
     required String title,
@@ -206,7 +222,7 @@ class WorkScreen extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(icon, color: color, size: 28),
@@ -308,7 +324,7 @@ class WorkScreen extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: priorityColor.withOpacity(0.1),
+                  color: priorityColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
@@ -338,7 +354,7 @@ class WorkScreen extends StatelessWidget {
                   vertical: 3,
                 ),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
+                  color: statusColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -351,6 +367,74 @@ class WorkScreen extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDayBox(String day, bool isPresent) {
+    return Column(
+      children: [
+        Text(
+          day,
+          style: const TextStyle(
+            color: Color(0xFF1E3A4C),
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: isPresent ? Colors.green : Colors.red,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            isPresent ? Icons.check : Icons.close,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 32),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors.grey.shade600,
+              fontSize: 12,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

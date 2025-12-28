@@ -291,7 +291,7 @@ class _CheckInScreenState extends State<CheckInScreen>
               borderRadius: BorderRadius.circular(32),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.13),
+                  color: Colors.black.withValues(alpha: 0.13),
                   blurRadius: 44,
                   offset: const Offset(0, 18),
                 ),
@@ -312,7 +312,7 @@ class _CheckInScreenState extends State<CheckInScreen>
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF6366F1).withOpacity(0.18),
+                        color: const Color(0xFF6366F1).withValues(alpha: 0.18),
                         blurRadius: 18,
                         offset: const Offset(0, 8),
                       ),
@@ -365,8 +365,8 @@ class _CheckInScreenState extends State<CheckInScreen>
         photoFile: file,
       );
 
-      final formattedTime = TimeOfDay.now().format(context);
       if (!mounted) return;
+      final formattedTime = TimeOfDay.now().format(context);
       setState(() {
         _isCheckedIn = !_isCheckedIn;
         _displayTime = formattedTime;
@@ -382,7 +382,7 @@ class _CheckInScreenState extends State<CheckInScreen>
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
       final msg = e.message;
-      if (msg != null && msg.contains('Face could not be detected')) {
+      if (msg.contains('Face could not be detected')) {
         _showStatusDialog(
           'Wajah tidak terdeteksi pada foto yang diambil.\n\nPastikan wajah Anda jelas terlihat di dalam frame dan tidak terhalang. Silakan coba lagi.',
           isError: true,
@@ -426,7 +426,7 @@ class _CheckInScreenState extends State<CheckInScreen>
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
+                  color: Colors.black.withValues(alpha: 0.15),
                   blurRadius: 40,
                   offset: const Offset(0, 20),
                 ),
@@ -491,7 +491,7 @@ class _CheckInScreenState extends State<CheckInScreen>
               borderRadius: BorderRadius.circular(28),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
+                  color: Colors.black.withValues(alpha: 0.15),
                   blurRadius: 40,
                   offset: const Offset(0, 20),
                 ),
@@ -504,7 +504,7 @@ class _CheckInScreenState extends State<CheckInScreen>
                   width: 72,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF22C55E).withOpacity(0.12),
+                    color: const Color(0xFF22C55E).withValues(alpha: 0.12),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -528,7 +528,7 @@ class _CheckInScreenState extends State<CheckInScreen>
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
-                    color: const Color(0xFF6B7280).withOpacity(0.9),
+                    color: const Color(0xFF6B7280).withValues(alpha: 0.9),
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -626,11 +626,11 @@ class _TopIconButton extends StatelessWidget {
         width: 44,
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.75),
+          color: Colors.white.withValues(alpha: 0.75),
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.07),
+              color: Colors.black.withValues(alpha: 0.07),
               blurRadius: 18,
               offset: const Offset(0, 12),
             ),
@@ -681,7 +681,7 @@ class _ScanCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(36),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 34,
             offset: const Offset(0, 20),
           ),
@@ -696,7 +696,7 @@ class _ScanCard extends StatelessWidget {
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: Colors.black.withOpacity(0.82),
+                color: Colors.black.withValues(alpha: 0.82),
               ),
             ),
           ),
@@ -723,7 +723,7 @@ class _ScanCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFF6366F1).withOpacity(0.28),
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.28),
                       width: 3,
                     ),
                   ),
@@ -734,7 +734,7 @@ class _ScanCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       width: 3,
                     ),
                   ),
@@ -745,7 +745,7 @@ class _ScanCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFF6366F1).withOpacity(0.4),
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.4),
                       width: 2,
                     ),
                   ),
@@ -949,7 +949,7 @@ class _CheckActionButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        splashColor: forceDisable ? Colors.transparent : const Color(0xFF6366F1).withOpacity(0.12),
+        splashColor: forceDisable ? Colors.transparent : const Color(0xFF6366F1).withValues(alpha: 0.12),
         highlightColor: Colors.transparent,
         onTap: forceDisable ? null : () => onTap?.call(),
         child: Opacity(
@@ -961,7 +961,7 @@ class _CheckActionButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 20,
                   offset: const Offset(0, 14),
                 ),
@@ -978,7 +978,7 @@ class _CheckActionButton extends StatelessWidget {
                         (isCheckedIn
                                 ? const Color(0xFF22C55E)
                                 : const Color(0xFF6366F1))
-                            .withOpacity(0.15),
+                            .withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Icon(
@@ -1048,7 +1048,7 @@ class _LocationCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(32),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 30,
             offset: const Offset(0, 20),
           ),
@@ -1118,7 +1118,7 @@ class _LocationCard extends StatelessWidget {
                     width: 128,
                     height: 128,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withOpacity(0.12),
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1126,7 +1126,7 @@ class _LocationCard extends StatelessWidget {
                     width: 78,
                     height: 78,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withOpacity(0.18),
+                      color: const Color(0xFF6366F1).withValues(alpha: 0.18),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1138,7 +1138,7 @@ class _LocationCard extends StatelessWidget {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF6366F1).withOpacity(0.3),
+                          color: const Color(0xFF6366F1).withValues(alpha: 0.3),
                           blurRadius: 20,
                         ),
                       ],
@@ -1163,7 +1163,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF9CA3AF).withOpacity(0.15)
+      ..color = const Color(0xFF9CA3AF).withValues(alpha: 0.15)
       ..strokeWidth = 1;
 
     const step = 24.0;

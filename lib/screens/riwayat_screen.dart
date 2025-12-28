@@ -81,7 +81,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                   Text(
                     'Pantau riwayat presensi Anda',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.72),
+                      color: Colors.white.withValues(alpha: 0.72),
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
@@ -220,32 +220,6 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     );
   }
 
-  Widget _buildSummary(List<AttendanceRecord> records) {
-    final hadir = records.where((r) => r.status.toLowerCase() == 'hadir').length;
-    final telat = records.where((r) => r.status.toLowerCase() == 'telat').length;
-    return Row(
-      children: [
-        Expanded(
-          child: _buildSummaryCard(
-            'Total Hadir',
-            hadir.toString(),
-            const Color(0xFF22C55E),
-            Icons.check_circle,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _buildSummaryCard(
-            'Total Telat',
-            telat.toString(),
-            const Color(0xFFF97316),
-            Icons.access_time,
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildFilterButton(String filter) {
     final isSelected = _selectedFilter == filter;
     return Expanded(
@@ -256,7 +230,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
           });
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: isSelected ? Colors.white : Colors.white.withOpacity(0.2),
+          backgroundColor: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.2),
           foregroundColor: isSelected ? const Color(0xFF0F172A) : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(8),
@@ -302,7 +276,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -323,7 +297,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF0F172A).withOpacity(0.1),
+                        color: const Color(0xFF0F172A).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(Icons.calendar_today_rounded, size: 20, color: const Color(0xFF0F172A)),
@@ -349,7 +323,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF22C55E).withOpacity(0.3),
+                          color: const Color(0xFF22C55E).withValues(alpha: 0.3),
                           blurRadius: 8,
                           offset: const Offset(0, 4),
                         ),
@@ -405,7 +379,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                         border: Border.all(color: Colors.white, width: 3),
                         boxShadow: [
                           BoxShadow(
-                            color: statusColor.withOpacity(0.3),
+                            color: statusColor.withValues(alpha: 0.3),
                             blurRadius: 6,
                             offset: const Offset(0, 2),
                           ),
@@ -445,7 +419,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: statusColor.withOpacity(0.1),
+                                    color: statusColor.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
@@ -489,7 +463,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                                   style: ElevatedButton.styleFrom(
                                     padding: EdgeInsets.zero,
                                     foregroundColor: statusColor,
-                                    backgroundColor: statusColor.withOpacity(0.1),
+                                    backgroundColor: statusColor.withValues(alpha: 0.1),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(8),
                                     ),
@@ -509,73 +483,6 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildSummaryCard(String title, String value, Color color, IconData icon) {
-    return Container(
-      padding: const EdgeInsets.all(11),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFBFBFD),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: color, size: 16),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            title,
-            style: const TextStyle(
-              color: Color(0xFF64748B),
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTimeDetail(IconData icon, String label) {
-    return Row(
-      children: [
-        Icon(icon, size: 13, color: const Color(0xFF94A3B8)),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(
-            color: Color(0xFF0F172A),
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
     );
   }
 
