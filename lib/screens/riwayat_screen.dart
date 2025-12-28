@@ -550,41 +550,101 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     final raw = record.photoUrl ?? record.photoPath;
     if (raw == null || raw.isEmpty) return null;
     if (raw.startsWith('http')) return raw;
-    final needsStoragePrefix = !raw.startsWith('/storage/') && !raw.startsWith('storage/');
-    final withStorage = needsStoragePrefix ? '/storage/$raw' : (raw.startsWith('/') ? raw : '/$raw');
-    return '${ApiService.baseUrl}$withStorage';
+    // Try different possible paths
+    final possibleUrls = [
+      '${ApiService.baseUrl}/storage/$raw',
+      '${ApiService.baseUrl}/api/storage/$raw', 
+      '${ApiService.baseUrl}/$raw',
+    ];
+    // For now, return the first one, but _showPhoto will try all
+    return possibleUrls[0];
   }
 
   void _showPhoto(String url) {
+    // Try different possible URLs
+    final possibleUrls = [
+      url,
+      url.replaceFirst('/storage/', '/api/storage/'),
+      url.replaceFirst('/storage/', '/'),
+    ];
+
+    print('Trying photo URLs: $possibleUrls');
+
     showDialog<void>(
       context: context,
       builder: (_) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
-          child: Stack(
-            children: [
-              AspectRatio(
-                aspectRatio: 3 / 4,
-                child: Image.network(
-                  url,
+          child: SizedBox(
+            width: double.infinity,
+            height: 400,
+            child: Stack(
+              children: [
+                // Try to load image with fallback
+                Image.network(
+                  possibleUrls[0],
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Center(child: Text('Tidak dapat memuat foto')),
+                  width: double.infinity,
+                  height: double.infinity,
+                  headers: const {
+                    'Accept': 'image/*',
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Center(child: CircularProgressIndicator());
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    print('Failed to load ${possibleUrls[0]}, error: $error');
+                    return Image.network(
+                      possibleUrls[1],
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      headers: const {
+                        'Accept': 'image/*',
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(child: CircularProgressIndicator());
+                      },
+                      errorBuilder: (context, error2, stackTrace2) {
+                        print('Failed to load ${possibleUrls[1]}, error: $error2');
+                        return Image.network(
+                          possibleUrls[2],
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                          headers: const {
+                            'Accept': 'image/*',
+                          },
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(child: CircularProgressIndicator());
+                          },
+                          errorBuilder: (context, error3, stackTrace3) {
+                            print('All URLs failed: $possibleUrls, final error: $error3');
+                            return const Center(child: Text('Tidak dapat memuat foto'));
+                          },
+                        );
+                      },
+                    );
+                  },
                 ),
-              ),
-              Positioned(
-                top: 8,
-                right: 8,
-                child: IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  style: IconButton.styleFrom(
-                    backgroundColor: Colors.black54,
-                    foregroundColor: Colors.white,
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.black54,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
