@@ -573,18 +573,21 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     showDialog<void>(
       context: context,
       builder: (_) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: SizedBox(
-            width: double.infinity,
-            height: 400,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.9,
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
             child: Stack(
               children: [
                 // Try to load image with fallback
                 Image.network(
                   possibleUrls[0],
-                  fit: BoxFit.cover,
+                  fit: BoxFit.contain, // Changed to contain to show full image without cropping
                   width: double.infinity,
                   height: double.infinity,
                   headers: const {
@@ -592,13 +595,18 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                   },
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
-                    return const Center(child: CircularProgressIndicator());
+                    return Container(
+                      width: double.infinity,
+                      height: 200,
+                      color: Colors.grey[200],
+                      child: const Center(child: CircularProgressIndicator()),
+                    );
                   },
                   errorBuilder: (context, error, stackTrace) {
                     print('Failed to load ${possibleUrls[0]}, error: $error');
                     return Image.network(
                       possibleUrls[1],
-                      fit: BoxFit.cover,
+                      fit: BoxFit.contain,
                       width: double.infinity,
                       height: double.infinity,
                       headers: const {
@@ -606,13 +614,18 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                       },
                       loadingBuilder: (context, child, loadingProgress) {
                         if (loadingProgress == null) return child;
-                        return const Center(child: CircularProgressIndicator());
+                        return Container(
+                          width: double.infinity,
+                          height: 200,
+                          color: Colors.grey[200],
+                          child: const Center(child: CircularProgressIndicator()),
+                        );
                       },
                       errorBuilder: (context, error2, stackTrace2) {
                         print('Failed to load ${possibleUrls[1]}, error: $error2');
                         return Image.network(
                           possibleUrls[2],
-                          fit: BoxFit.cover,
+                          fit: BoxFit.contain,
                           width: double.infinity,
                           height: double.infinity,
                           headers: const {
@@ -620,11 +633,26 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                           },
                           loadingBuilder: (context, child, loadingProgress) {
                             if (loadingProgress == null) return child;
-                            return const Center(child: CircularProgressIndicator());
+                            return Container(
+                              width: double.infinity,
+                              height: 200,
+                              color: Colors.grey[200],
+                              child: const Center(child: CircularProgressIndicator()),
+                            );
                           },
                           errorBuilder: (context, error3, stackTrace3) {
                             print('All URLs failed: $possibleUrls, final error: $error3');
-                            return const Center(child: Text('Tidak dapat memuat foto'));
+                            return Container(
+                              width: double.infinity,
+                              height: 200,
+                              color: Colors.grey[200],
+                              child: const Center(
+                                child: Text(
+                                  'Tidak dapat memuat foto',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ),
+                            );
                           },
                         );
                       },
