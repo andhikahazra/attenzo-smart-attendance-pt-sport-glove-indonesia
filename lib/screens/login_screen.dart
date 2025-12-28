@@ -47,28 +47,13 @@ class _LoginScreenState extends State<LoginScreen> {
               Positioned(
                 top: 20,
                 right: 20,
-                child: Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.settings_rounded,
                     color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    size: 28,
                   ),
-                  child: IconButton(
-                    icon: const Icon(
-                      Icons.settings_rounded,
-                      color: Color(0xFF1E3A4C),
-                      size: 24,
-                    ),
-                    onPressed: _openSettingsDialog,
-                  ),
+                  onPressed: _openSettingsDialog,
                 ),
               ),
               // Content - Welcome Screen
@@ -80,46 +65,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Container(
-                            width: 200,
-                            height: 200,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [Color(0xFF0F172A), Color(0xFF111827)],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.2),
-                                  blurRadius: 28,
-                                  offset: const Offset(0, 14),
-                                ),
-                              ],
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.25),
-                                width: 2,
-                              ),
-                            ),
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: const [
-                                Icon(
-                                  Icons.face_retouching_natural,
-                                  size: 112,
-                                  color: Color(0xFF0F172A),
-                                ),
-                                Positioned(
-                                  bottom: 54,
-                                  child: Icon(
-                                    Icons.camera_enhance_outlined,
-                                    size: 52,
-                                    color: Color(0xFF0F172A),
-                                  ),
-                                ),
-                              ],
-                            ),
+                          const Icon(
+                            Icons.sports_baseball,
+                            size: 120,
+                            color: Colors.white,
                           ),
                           const SizedBox(height: 24),
                           const Text(
@@ -758,6 +707,7 @@ class _SettingsDialogState extends State<SettingsDialog> {
           onPressed: _isLoading ? null : _saveUrl,
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFF1E3A4C),
+            foregroundColor: Colors.white,
           ),
           child: const Text('Simpan'),
         ),

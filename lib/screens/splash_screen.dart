@@ -62,16 +62,6 @@ class _SplashScreenState extends State<SplashScreen>
         ),
         child: Stack(
           children: [
-            Positioned(
-              top: -120,
-              right: -60,
-              child: _blurCircle(220, const Color(0xFF111827).withValues(alpha: 0.22)),
-            ),
-            Positioned(
-              bottom: -140,
-              left: -40,
-              child: _blurCircle(260, Colors.white.withValues(alpha: 0.10)),
-            ),
             Center(
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -84,35 +74,10 @@ class _SplashScreenState extends State<SplashScreen>
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        width: 170,
-                        height: 170,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF0F172A), Color(0xFF111827)],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.12),
-                              blurRadius: 28,
-                              offset: const Offset(0, 14),
-                            ),
-                          ],
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 2),
-                        ),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: const [
-                            Icon(Icons.face_retouching_natural, size: 100, color: Color(0xFF0F172A)),
-                            Positioned(
-                              bottom: 48,
-                              child: Icon(Icons.camera_enhance_outlined, size: 50, color: Color(0xFF0F172A)),
-                            ),
-                          ],
-                        ),
+                      const Icon(
+                        Icons.sports_baseball,
+                        size: 120,
+                        color: Colors.white,
                       ),
                       const SizedBox(height: 30),
                       const Text(
@@ -163,24 +128,6 @@ class _SplashScreenState extends State<SplashScreen>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _blurCircle(double size, Color color) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: color,
-        boxShadow: [
-          BoxShadow(
-            color: color,
-            blurRadius: size / 2,
-            spreadRadius: size / 4,
-          ),
-        ],
       ),
     );
   }
