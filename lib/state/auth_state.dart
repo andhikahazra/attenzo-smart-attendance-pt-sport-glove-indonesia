@@ -43,6 +43,13 @@ class AuthState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setAuthData(String token, User user) {
+    _token = token;
+    _user = user;
+    _error = null;
+    notifyListeners();
+  }
+
   void _setLoading(bool value) {
     _isLoading = value;
     notifyListeners();

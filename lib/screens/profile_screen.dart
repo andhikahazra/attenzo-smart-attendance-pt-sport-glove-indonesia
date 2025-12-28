@@ -3,11 +3,64 @@ import 'package:provider/provider.dart';
 
 import '../state/auth_state.dart';
 import '../utils/app_colors.dart';
+import '../services/api_service.dart';
+import '../models/location.dart';
 import 'face_registration_screen.dart';
 import 'login_screen.dart';
 
-class ProfileContent extends StatelessWidget {
+class ProfileContent extends StatefulWidget {
   const ProfileContent({super.key});
+
+  @override
+  State<ProfileContent> createState() => _ProfileContentState();
+}
+
+class _ProfileContentState extends State<ProfileContent> {
+  List<Location> _locations = [];
+  bool _isLoadingLocations = true;
+  String? _locationError;
+  final ApiService _api = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocations();
+  }
+
+  @override
+  void dispose() {
+    _api.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadLocations() async {
+    final auth = context.read<AuthState>();
+    final token = auth.token;
+
+    if (token == null) {
+      setState(() {
+        _isLoadingLocations = false;
+        _locationError = 'Token tidak tersedia';
+      });
+      return;
+    }
+
+    try {
+      final locations = await _api.getLocations(token: token);
+      setState(() {
+        _locations = locations;
+        _isLoadingLocations = false;
+        _locationError = null;
+      });
+    } catch (e) {
+      // Debug logging
+      debugPrint('Error loading locations: $e');
+      setState(() {
+        _isLoadingLocations = false;
+        _locationError = 'Gagal memuat data lokasi';
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,12 +127,8 @@ class ProfileContent extends StatelessWidget {
               const SizedBox(height: 20),
               _buildInfoCard('Email', user?.email ?? '-', Icons.email),
               _buildInfoCard('Phone', '+62 812-3456-7890', Icons.phone),
-              _buildInfoCard(
-                'Location',
-                'Office, Yogyakarta, IN',
-                Icons.location_on,
-              ),
-              _buildInfoCard('Employee ID', 'SG-2024-001', Icons.badge),
+              _buildLocationCard(),
+              _buildInfoCard('Employee Code', 'attenzo', Icons.badge),
               const SizedBox(height: 30),
               SizedBox(
                 width: double.infinity,
@@ -154,7 +203,159 @@ class ProfileContent extends StatelessWidget {
     );
   }
 
-  static Widget _buildRegisterShortcutCard({required VoidCallback onTap}) {
+  Widget _buildLocationCard() {
+    if (_isLoadingLocations) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          gradient: AppColors.cardGradient,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.location_on, color: AppColors.primary),
+            SizedBox(width: 12),
+            Text('Memuat lokasi...', style: TextStyle(color: AppColors.textSecondary)),
+            Spacer(),
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_locationError != null) {
+      return Container(
+        margin: const EdgeInsets.only(bottom: 15),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          gradient: AppColors.cardGradient,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: AppColors.error),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Location',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _locationError!,
+                    style: TextStyle(
+                      color: AppColors.error,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: () {
+                setState(() {
+                  _isLoadingLocations = true;
+                  _locationError = null;
+                });
+                _loadLocations();
+              },
+              icon: Icon(Icons.refresh, color: AppColors.primary),
+              tooltip: 'Coba lagi',
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (_locations.isEmpty) {
+      return _buildInfoCard('Location', 'Belum ada data lokasi', Icons.location_on);
+    }
+
+    // Display first location or combine multiple locations
+    final location = _locations.first;
+    final locationText = _locations.length == 1
+        ? location.name
+        : '${location.name} (+${_locations.length - 1} lainnya)';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        gradient: AppColors.cardGradient,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.location_on, color: AppColors.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Location',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  locationText,
+                  style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (_locations.length == 1) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    'Radius: ${location.allowedRadiusMeters}m',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegisterShortcutCard({required VoidCallback onTap}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(15),
@@ -224,8 +425,7 @@ class ProfileContent extends StatelessWidget {
     );
   }
 
-
-  static Widget _buildInfoCard(String title, String value, IconData icon) {
+  Widget _buildInfoCard(String title, String value, IconData icon) {
     return Container(
       margin: const EdgeInsets.only(bottom: 15),
       padding: const EdgeInsets.all(15),

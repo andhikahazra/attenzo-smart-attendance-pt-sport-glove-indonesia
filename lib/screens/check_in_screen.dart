@@ -1,11 +1,14 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
 
+import '../models/location.dart';
 import '../services/api_service.dart';
 import '../state/auth_state.dart';
 
@@ -28,15 +31,196 @@ class _CheckInScreenState extends State<CheckInScreen>
   final ApiService _api = ApiService();
   Timer? _timer;
 
+  // Location validation states
+  List<Location> _officeLocations = [];
+  bool _isLocationValid = false;
+  bool _isCheckingLocation = true;
+  String _locationStatus = 'Memeriksa lokasi...';
+  String? _locationWarning;
+  bool _hasShownLocationWarning = false; // Track if warning has been shown
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
+    _initializeLocationValidation();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateTime();
       _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
     });
+  }
+
+  Future<void> _initializeLocationValidation() async {
+    await _fetchOfficeLocations();
+    await _validateUserLocation();
+  }
+
+  Future<void> _fetchOfficeLocations() async {
+    final auth = context.read<AuthState>();
+    final token = auth.token;
+
+    if (token == null) {
+      setState(() {
+        _isCheckingLocation = false;
+        _locationWarning = 'Token tidak tersedia';
+      });
+      return;
+    }
+
+    try {
+      final locations = await _api.getLocations(token: token);
+      setState(() {
+        _officeLocations = locations;
+      });
+    } catch (e) {
+      debugPrint('Error fetching office locations: $e');
+      setState(() {
+        _isCheckingLocation = false;
+        _locationWarning = 'Gagal memuat data lokasi kantor';
+      });
+    }
+  }
+
+  Future<void> _validateUserLocation() async {
+    if (_officeLocations.isEmpty) {
+      setState(() {
+        _isCheckingLocation = false;
+        _locationWarning = 'Tidak ada data lokasi kantor';
+      });
+      return;
+    }
+
+    try {
+      // Request location permission
+      final permissionStatus = await Permission.location.status;
+      if (permissionStatus.isDenied || permissionStatus.isPermanentlyDenied) {
+        final permission = await Permission.location.request();
+        if (!permission.isGranted) {
+          setState(() {
+            _isCheckingLocation = false;
+            _locationWarning = 'Izin lokasi diperlukan untuk absensi';
+          });
+          return;
+        }
+      } else if (!permissionStatus.isGranted) {
+        setState(() {
+          _isCheckingLocation = false;
+          _locationWarning = 'Izin lokasi diperlukan untuk absensi';
+        });
+        return;
+      }
+
+      // Get current position
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      // Check if user is within any office location radius
+      bool isValid = false;
+      Location? nearestLocation;
+      double minDistance = double.infinity;
+
+      for (final office in _officeLocations) {
+        final distance = _calculateDistance(
+          position.latitude,
+          position.longitude,
+          office.latitude,
+          office.longitude,
+        );
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearestLocation = office;
+        }
+
+        if (distance <= office.allowedRadiusMeters) {
+          isValid = true;
+          break;
+        }
+      }
+
+      setState(() {
+        _isCheckingLocation = false;
+        _isLocationValid = isValid;
+        if (isValid) {
+          _locationStatus = 'Lokasi valid ✓';
+          _locationWarning = null;
+          _hasShownLocationWarning = false; // Reset flag when location becomes valid
+        } else {
+          _locationStatus = 'Lokasi tidak valid';
+          _locationWarning = 'Anda tidak berada di lokasi kerja. Jarak dari ${nearestLocation?.name ?? "kantor"}: ${minDistance.toStringAsFixed(0)} meter';
+        }
+      });
+
+      // Show warning flash if location is invalid
+      if (!isValid) {
+        _showLocationWarning();
+      }
+
+    } catch (e) {
+      debugPrint('Error validating user location: $e');
+      setState(() {
+        _isCheckingLocation = false;
+        _isLocationValid = false;
+        _locationWarning = 'Gagal memeriksa lokasi Anda';
+      });
+    }
+  }
+
+  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+    const double earthRadius = 6371000; // Radius bumi dalam meter
+    final double dLat = (lat2 - lat1) * pi / 180;
+    final double dLon = (lon2 - lon1) * pi / 180;
+    final double a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * pi / 180) * cos(lat2 * pi / 180) * sin(dLon / 2) * sin(dLon / 2);
+    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+    return earthRadius * c;
+  }
+
+  void _showLocationWarning() {
+    // Only show warning if not already shown to prevent spam
+    if (_hasShownLocationWarning) return;
+
+    _hasShownLocationWarning = true;
+
+    // Show warning snackbar
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.warning, color: Colors.white),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                _locationWarning ?? 'Anda tidak berada di lokasi kerja',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.orange.shade700,
+        duration: const Duration(seconds: 8), // Increased duration
+        action: SnackBarAction(
+          label: 'Tutup',
+          textColor: Colors.white,
+          onPressed: () {
+            if (mounted) {
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            }
+          },
+        ),
+        onVisible: () {
+          // Reset flag when snackbar is dismissed
+          Future.delayed(const Duration(seconds: 8), () {
+            if (mounted) {
+              _hasShownLocationWarning = false;
+            }
+          });
+        },
+      ),
+    );
   }
 
   @override
@@ -228,9 +412,23 @@ class _CheckInScreenState extends State<CheckInScreen>
                             displayTime: _displayTime,
                             isCheckedIn: _isCheckedIn,
                             isLoading: _isPosting,
+                            isLocationValid: _isLocationValid,
                           ),
                           const SizedBox(height: 20),
-                          const _LocationCard(),
+                          _LocationCard(
+                            isCheckingLocation: _isCheckingLocation,
+                            isLocationValid: _isLocationValid,
+                            locationStatus: _locationStatus,
+                            locationWarning: _locationWarning,
+                            onRetryLocation: () {
+                              setState(() {
+                                _isCheckingLocation = true;
+                                _locationWarning = null;
+                                _hasShownLocationWarning = false; // Reset warning flag
+                              });
+                              _validateUserLocation();
+                            },
+                          ),
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -654,6 +852,7 @@ class _ScanCard extends StatelessWidget {
     required this.displayTime,
     required this.isCheckedIn,
     required this.isLoading,
+    required this.isLocationValid,
   });
 
   final CameraController? cameraController;
@@ -666,6 +865,7 @@ class _ScanCard extends StatelessWidget {
   final String displayTime;
   final bool isCheckedIn;
   final bool isLoading;
+  final bool isLocationValid;
 
   @override
   Widget build(BuildContext context) {
@@ -759,7 +959,8 @@ class _ScanCard extends StatelessWidget {
             time: displayTime,
             isLoading: isLoading,
             onTap: isLoading ? null : onActionTap,
-            forceDisable: isLoading,
+            forceDisable: isLoading || !isLocationValid,
+            isLocationValid: isLocationValid,
           ),
         ],
       ),
@@ -935,6 +1136,7 @@ class _CheckActionButton extends StatelessWidget {
     required this.isLoading,
     this.onTap,
     this.forceDisable = false,
+    this.isLocationValid = true,
   });
 
   final bool isCheckedIn;
@@ -942,6 +1144,7 @@ class _CheckActionButton extends StatelessWidget {
   final bool isLoading;
   final Future<void> Function()? onTap;
   final bool forceDisable;
+  final bool isLocationValid;
 
   @override
   Widget build(BuildContext context) {
@@ -995,13 +1198,17 @@ class _CheckActionButton extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isCheckedIn
-                          ? 'Tap to Check-Out'
-                          : 'Tap to Absen',
-                      style: const TextStyle(
+                      forceDisable && !isLocationValid
+                          ? 'Lokasi tidak valid'
+                          : isCheckedIn
+                              ? 'Tap to Check-Out'
+                              : 'Tap to Absen',
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF6B7280),
+                        color: forceDisable && !isLocationValid
+                            ? const Color(0xFFD97706)
+                            : const Color(0xFF6B7280),
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1036,7 +1243,19 @@ class _CheckActionButton extends StatelessWidget {
 }
 
 class _LocationCard extends StatelessWidget {
-  const _LocationCard();
+  final bool isCheckingLocation;
+  final bool isLocationValid;
+  final String locationStatus;
+  final String? locationWarning;
+  final VoidCallback onRetryLocation;
+
+  const _LocationCard({
+    required this.isCheckingLocation,
+    required this.isLocationValid,
+    required this.locationStatus,
+    this.locationWarning,
+    required this.onRetryLocation,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1064,37 +1283,74 @@ class _LocationCard extends StatelessWidget {
                 height: 44,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF6366F1), Color(0xFF4338CA)],
+                  gradient: LinearGradient(
+                    colors: isCheckingLocation
+                        ? [Colors.blue, Colors.blue.shade700]
+                        : isLocationValid
+                            ? [const Color(0xFF10B981), const Color(0xFF059669)]
+                            : [const Color(0xFFF59E0B), const Color(0xFFD97706)],
                   ),
                 ),
-                child: const Icon(Icons.location_on, color: Colors.white),
+                child: isCheckingLocation
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : Icon(
+                        isLocationValid ? Icons.check_circle : Icons.warning,
+                        color: Colors.white,
+                      ),
               ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
-                    Text(
-                      'Current Location',
+                  children: [
+                    const Text(
+                      'Location Status',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: Color(0xFF6B7280),
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
-                      'Main Office - Entrance Gate',
+                      locationStatus,
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111827),
+                        color: isCheckingLocation
+                            ? Colors.blue
+                            : isLocationValid
+                                ? const Color(0xFF059669)
+                                : const Color(0xFFD97706),
                       ),
                     ),
+                    if (locationWarning != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        locationWarning!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFFD97706),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
+              if (!isCheckingLocation && !isLocationValid)
+                IconButton(
+                  onPressed: onRetryLocation,
+                  icon: const Icon(Icons.refresh, color: Color(0xFFD97706)),
+                  tooltip: 'Coba lagi',
+                ),
             ],
           ),
           const SizedBox(height: 16),
@@ -1103,12 +1359,24 @@ class _LocationCard extends StatelessWidget {
             child: Container(
               width: double.infinity,
               height: 180,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFDCEBFF), Color(0xFFEFF6FF)],
-                ),
+              decoration: BoxDecoration(
+                gradient: isCheckingLocation
+                    ? const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFDCEBFF), Color(0xFFEFF6FF)],
+                      )
+                    : isLocationValid
+                        ? const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFD1FAE5), Color(0xFFF0F9FF)],
+                          )
+                        : const LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [Color(0xFFFDF2E0), Color(0xFFFFF8E1)],
+                          ),
               ),
               child: Stack(
                 alignment: Alignment.center,
@@ -1118,7 +1386,12 @@ class _LocationCard extends StatelessWidget {
                     width: 128,
                     height: 128,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.12),
+                      color: (isCheckingLocation
+                              ? Colors.blue
+                              : isLocationValid
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFFF59E0B))
+                          .withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1126,7 +1399,12 @@ class _LocationCard extends StatelessWidget {
                     width: 78,
                     height: 78,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.18),
+                      color: (isCheckingLocation
+                              ? Colors.blue
+                              : isLocationValid
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFFF59E0B))
+                          .withValues(alpha: 0.18),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1134,20 +1412,38 @@ class _LocationCard extends StatelessWidget {
                     width: 40,
                     height: 40,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1),
+                      color: isCheckingLocation
+                          ? Colors.blue
+                          : isLocationValid
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFF59E0B),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF6366F1).withValues(alpha: 0.3),
+                          color: (isCheckingLocation
+                                  ? Colors.blue
+                                  : isLocationValid
+                                      ? const Color(0xFF10B981)
+                                      : const Color(0xFFF59E0B))
+                              .withValues(alpha: 0.3),
                           blurRadius: 20,
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons.my_location,
-                      color: Colors.white,
-                      size: 20,
-                    ),
+                    child: isCheckingLocation
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : Icon(
+                            isLocationValid ? Icons.check_circle : Icons.warning,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                   ),
                 ],
               ),

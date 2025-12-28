@@ -47,5 +47,9 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Kamera diperlukan untuk proses check-in wajah.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Lokasi diperlukan untuk memvalidasi bahwa Anda berada di area kantor saat absensi.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Lokasi diperlukan untuk memvalidasi bahwa Anda berada di area kantor saat absensi.</string>
 </dict>
 </plist>

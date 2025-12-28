@@ -1,5 +1,10 @@
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../services/api_service.dart';
+import '../screens/home_screen.dart';
+import '../state/auth_state.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,7 +18,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _passwordConfirmationController = TextEditingController();
   bool _obscurePassword = true;
+  bool _obscurePasswordConfirmation = true;
   bool _isLoading = false;
   String? _error;
 
@@ -22,19 +29,54 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _passwordConfirmationController.dispose();
     super.dispose();
   }
 
   void _register() async {
     if (_formKey.currentState?.validate() ?? false) {
-      setState(() => _isLoading = true);
-      await Future.delayed(const Duration(seconds: 2));
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Registrasi berhasil!')),
-      );
-      Navigator.pop(context);
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
+      try {
+        final api = ApiService();
+        final response = await api.register(
+          name: _nameController.text.trim(),
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          passwordConfirmation: _passwordConfirmationController.text,
+        );
+
+        if (!mounted) return;
+
+        // Save auth data
+        final auth = context.read<AuthState>();
+        auth.setAuthData(response.token, response.user);
+
+        setState(() => _isLoading = false);
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Registrasi berhasil!')),
+        );
+
+        // Navigate to home screen
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isLoading = false;
+          _error = e.toString().contains('HttpException')
+              ? e.toString().replaceAll('HttpException: ', '')
+              : 'Terjadi kesalahan: ${e.toString()}';
+        });
+      }
     }
   }
 
@@ -181,7 +223,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.done,
+                        textInputAction: TextInputAction.next,
                         validator: (val) {
                           if (val == null || val.isEmpty) return 'Password wajib diisi';
                           if (val.length < 6) return 'Minimal 6 karakter';
@@ -197,6 +239,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               color: const Color(0xFF9CA3AF),
                             ),
                             onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextFormField(
+                        controller: _passwordConfirmationController,
+                        obscureText: _obscurePasswordConfirmation,
+                        textInputAction: TextInputAction.done,
+                        validator: (val) {
+                          if (val == null || val.isEmpty) return 'Konfirmasi password wajib diisi';
+                          if (val != _passwordController.text) return 'Password tidak cocok';
+                          return null;
+                        },
+                        decoration: _inputDecoration(
+                          label: 'Konfirmasi Password',
+                          suffix: IconButton(
+                            icon: Icon(
+                              _obscurePasswordConfirmation
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              color: const Color(0xFF9CA3AF),
+                            ),
+                            onPressed: () => setState(() => _obscurePasswordConfirmation = !_obscurePasswordConfirmation),
                           ),
                         ),
                       ),

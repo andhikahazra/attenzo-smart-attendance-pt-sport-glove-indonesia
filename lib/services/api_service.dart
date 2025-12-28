@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,6 +10,7 @@ import '../models/attendance_record.dart';
 import '../models/face_photos.dart';
 import '../models/login_response.dart';
 import '../models/user.dart';
+import '../models/location.dart';
 
 class ApiService {
   ApiService({http.Client? client}) : _client = client ?? http.Client();
@@ -71,6 +73,42 @@ class ApiService {
       throw HttpException('Respon tidak valid: ${e.message}');
     } on TimeoutException {
       throw const HttpException('Login timeout, coba lagi');
+    }
+  }
+
+  Future<LoginResponse> register({
+    required String name,
+    required String email,
+    required String password,
+    required String passwordConfirmation,
+  }) async {
+    final url = await _uri('/api/register');
+    try {
+      final response = await _client
+          .post(
+            url,
+            headers: _headers(extra: {HttpHeaders.contentTypeHeader: 'application/json'}),
+            body: jsonEncode({
+              'name': name,
+              'email': email,
+              'password': password,
+              'password_confirmation': passwordConfirmation,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      _logResponse('POST', url, response);
+      _ensureSuccess(response);
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return LoginResponse.fromJson(data);
+    } on SocketException {
+      throw const HttpException('Tidak bisa terhubung ke server');
+    } on HttpException {
+      rethrow;
+    } on FormatException catch (e) {
+      throw HttpException('Respon tidak valid: ${e.message}');
+    } on TimeoutException {
+      throw const HttpException('Register timeout, coba lagi');
     }
   }
 
@@ -202,6 +240,52 @@ class ApiService {
     return rawList
         .whereType<Map<String, dynamic>>()
         .map(AttendanceRecord.fromJson)
+        .toList();
+  }
+
+  Future<List<Location>> getLocations({required String token}) async {
+    final response = await _client.get(
+      await _uri('/api/locations'),
+      headers: _headers(token: token),
+    );
+
+    _ensureSuccess(response);
+    final body = jsonDecode(response.body);
+    
+    // Debug logging
+    debugPrint('Locations API Response: $body');
+
+    List<dynamic> rawList;
+    if (body is List) {
+      // Response is array of locations
+      debugPrint('Response is List with ${body.length} items');
+      rawList = body;
+    } else if (body is Map<String, dynamic>) {
+      // Response is object, check for data/locations key
+      if (body['data'] is List) {
+        debugPrint('Response has data array with ${(body['data'] as List).length} items');
+        rawList = body['data'] as List;
+      } else if (body['locations'] is List) {
+        debugPrint('Response has locations array with ${(body['locations'] as List).length} items');
+        rawList = body['locations'] as List;
+      } else if (body['data'] is Map<String, dynamic>) {
+        // Single location wrapped in data object
+        debugPrint('Response has single data object');
+        rawList = [body['data']];
+      } else {
+        // Single location object
+        debugPrint('Response is single location object');
+        rawList = [body];
+      }
+    } else {
+      debugPrint('Response is unknown type: ${body.runtimeType}');
+      rawList = <dynamic>[];
+    }
+
+    debugPrint('Parsed ${rawList.length} locations');
+    return rawList
+        .whereType<Map<String, dynamic>>()
+        .map(Location.fromJson)
         .toList();
   }
 
