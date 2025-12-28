@@ -57,7 +57,7 @@ class FaceRegistrationState extends ChangeNotifier {
       final FacePhotosData data = await _api.getFacePhotos(token: token);
       _remoteUrls.clear();
       for (int i = 0; i < angles.length && i < data.photoUrls.length; i++) {
-        _remoteUrls[angles[i]] = _normalizeUrl(data.photoUrls[i]);
+        _remoteUrls[angles[i]] = await _normalizeUrl(data.photoUrls[i]);
       }
     } catch (e) {
       _error = e.toString();
@@ -67,12 +67,13 @@ class FaceRegistrationState extends ChangeNotifier {
     }
   }
 
-  String _normalizeUrl(String raw) {
+  Future<String> _normalizeUrl(String raw) async {
     // If backend returns relative path, prefix with baseUrl.
     if (!raw.startsWith('http')) {
-      final base = ApiService.baseUrl.endsWith('/')
-          ? ApiService.baseUrl.substring(0, ApiService.baseUrl.length - 1)
-          : ApiService.baseUrl;
+      final baseUrl = await ApiService.getCurrentBaseUrl();
+      final base = baseUrl.endsWith('/')
+          ? baseUrl.substring(0, baseUrl.length - 1)
+          : baseUrl;
       final path = raw.startsWith('/') ? raw : '/$raw';
       return '$base$path';
     }
@@ -80,7 +81,7 @@ class FaceRegistrationState extends ChangeNotifier {
     final uri = Uri.tryParse(raw);
     if (uri == null) return raw;
     if (uri.host == '127.0.0.1' || uri.host == 'localhost') {
-      final baseUri = Uri.parse(ApiService.baseUrl);
+      final baseUri = Uri.parse(await ApiService.getCurrentBaseUrl());
       return uri.replace(host: baseUri.host, port: baseUri.port).toString();
     }
     return raw;

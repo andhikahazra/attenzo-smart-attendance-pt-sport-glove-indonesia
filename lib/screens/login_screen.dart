@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:provider/provider.dart';
 
@@ -18,6 +19,13 @@ class _LoginScreenState extends State<LoginScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const SignInPage()),
+    );
+  }
+
+  void _openSettingsDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => const SettingsDialog(),
     );
   }
 
@@ -59,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       color: Color(0xFF1E3A4C),
                       size: 24,
                     ),
-                    onPressed: () {},
+                    onPressed: _openSettingsDialog,
                   ),
                 ),
               ),
@@ -642,6 +650,118 @@ class _SocialButton extends StatelessWidget {
         ],
       ),
       child: Icon(icon, color: iconColor, size: 26),
+    );
+  }
+}
+
+class SettingsDialog extends StatefulWidget {
+  const SettingsDialog({super.key});
+
+  @override
+  State<SettingsDialog> createState() => _SettingsDialogState();
+}
+
+class _SettingsDialogState extends State<SettingsDialog> {
+  final TextEditingController _urlController = TextEditingController();
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentUrl();
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCurrentUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUrl = prefs.getString('base_url') ?? 'https://your-api.com';
+    setState(() {
+      _urlController.text = savedUrl;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveUrl() async {
+    final url = _urlController.text.trim();
+    if (url.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('URL tidak boleh kosong')),
+      );
+      return;
+    }
+
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('URL harus dimulai dengan http:// atau https://')),
+      );
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('base_url', url);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Base URL berhasil disimpan')),
+    );
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text(
+        'Pengaturan API',
+        style: TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF1E3A4C),
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Masukkan Base URL untuk API server:',
+            style: TextStyle(fontSize: 14),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _urlController,
+            decoration: InputDecoration(
+              labelText: 'Base URL',
+              hintText: 'https://your-api.com',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            enabled: !_isLoading,
+          ),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 16),
+              child: CircularProgressIndicator(),
+            ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Batal'),
+        ),
+        ElevatedButton(
+          onPressed: _isLoading ? null : _saveUrl,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF1E3A4C),
+          ),
+          child: const Text('Simpan'),
+        ),
+      ],
     );
   }
 }

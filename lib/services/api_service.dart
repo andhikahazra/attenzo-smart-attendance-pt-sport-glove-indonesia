@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/attendance_record.dart';
 import '../models/face_photos.dart';
@@ -12,11 +13,27 @@ import '../models/user.dart';
 class ApiService {
   ApiService({http.Client? client}) : _client = client ?? http.Client();
 
-  static const String baseUrl = 'http://10.0.2.2:8000';
-  // static const String baseUrl = 'http://10.113.22.213:8000';
+  static const String _defaultBaseUrl = 'http://10.0.2.2:8000';
   final http.Client _client;
 
-  Uri _uri(String path) => Uri.parse('$baseUrl$path');
+  // Synchronous getter for backward compatibility
+  static String get baseUrl => _defaultBaseUrl;
+
+  Future<String> _getBaseUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('base_url') ?? _defaultBaseUrl;
+  }
+
+  // Public method to get current base URL
+  static Future<String> getCurrentBaseUrl() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('base_url') ?? _defaultBaseUrl;
+  }
+
+  Future<Uri> _uri(String path) async {
+    final baseUrl = await _getBaseUrl();
+    return Uri.parse('$baseUrl$path');
+  }
 
   Map<String, String> _headers({String? token, Map<String, String>? extra}) {
     final headers = <String, String>{
@@ -32,7 +49,7 @@ class ApiService {
   }
 
   Future<LoginResponse> login({required String email, required String password}) async {
-    final url = _uri('/api/login');
+    final url = await _uri('/api/login');
     try {
       final response = await _client
           .post(
@@ -59,7 +76,7 @@ class ApiService {
 
   Future<User> getUser({required String token}) async {
     final response = await _client.get(
-      _uri('/api/user'),
+      await _uri('/api/user'),
       headers: _headers(token: token),
     );
     _ensureSuccess(response);
@@ -68,7 +85,7 @@ class ApiService {
 
   Future<FacePhotosData> getFacePhotos({required String token}) async {
     final response = await _client.get(
-      _uri('/api/face-photos'),
+      await _uri('/api/face-photos'),
       headers: _headers(token: token),
     );
     _ensureSuccess(response);
@@ -80,7 +97,8 @@ class ApiService {
     required String token,
     required List<File> photos,
   }) async {
-    final request = http.MultipartRequest('POST', _uri('/api/face-photos/encode'))
+    final baseUrl = await _getBaseUrl();
+    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/api/face-photos/encode'))
       ..headers.addAll(_headers(token: token));
 
     for (final file in photos) {
@@ -100,7 +118,7 @@ class ApiService {
     required List<String> photoPaths,
   }) async {
     final response = await _client.post(
-      _uri('/api/face-photos'),
+      await _uri('/api/face-photos'),
       headers: _headers(
         token: token,
         extra: {HttpHeaders.contentTypeHeader: 'application/json'},
@@ -119,7 +137,7 @@ class ApiService {
     required String faceEmbed,
   }) async {
     final response = await _client.post(
-      _uri('/api/update-embed-face'),
+      await _uri('/api/update-embed-face'),
       headers: _headers(
         token: token,
         extra: {HttpHeaders.contentTypeHeader: 'application/json'},
@@ -142,7 +160,8 @@ class ApiService {
     required String attendanceTime,
     required File photoFile,
   }) async {
-    final request = http.MultipartRequest('POST', _uri('/api/attendance'))
+    final baseUrl = await _getBaseUrl();
+    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/api/attendance'))
       ..headers.addAll(_headers(token: token))
       ..fields['type'] = type
       ..fields['attendance_date'] = attendanceDate
@@ -164,7 +183,7 @@ class ApiService {
     required String token,
   }) async {
     final response = await _client.get(
-      _uri('/api/attendance'),
+      await _uri('/api/attendance'),
       headers: _headers(token: token),
     );
 
