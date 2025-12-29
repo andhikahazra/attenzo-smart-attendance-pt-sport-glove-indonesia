@@ -559,26 +559,12 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     final raw = record.photoUrl ?? record.photoPath;
     if (raw == null || raw.isEmpty) return null;
     if (raw.startsWith('http')) return raw;
-    final base = _baseUrl ?? ApiService.baseUrl;
-    final possibleUrls = [
-      '$base/storage/$raw',
-      '$base/api/storage/$raw',
-      '$base/$raw',
-    ];
-    return possibleUrls[0];
+    // Only use /storage/attendance/... endpoint
+    return '${_baseUrl ?? ApiService.baseUrl}/storage/$raw';
   }
 
   void _showPhoto(String url) {
-    final base = _baseUrl ?? ApiService.baseUrl;
-    // Try different possible URLs
-    final possibleUrls = [
-      url,
-      url.replaceFirst(base + '/storage/', base + '/api/storage/'),
-      url.replaceFirst(base + '/storage/', base + '/'),
-    ];
-
-    print('Trying photo URLs: $possibleUrls');
-
+    print('Trying photo URL: $url');
     showDialog<void>(
       context: context,
       builder: (_) => Dialog(
@@ -593,9 +579,8 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
             ),
             child: Stack(
               children: [
-                // Try to load image with fallback
                 Image.network(
-                  possibleUrls[0],
+                  url,
                   fit: BoxFit.contain,
                   width: double.infinity,
                   height: double.infinity,
@@ -612,59 +597,17 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                     );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    print('Failed to load \\${possibleUrls[0]}, error: $error');
-                    return Image.network(
-                      possibleUrls[1],
-                      fit: BoxFit.contain,
+                    print('Failed to load $url, error: $error');
+                    return Container(
                       width: double.infinity,
-                      height: double.infinity,
-                      headers: const {
-                        'Accept': 'image/*',
-                      },
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          width: double.infinity,
-                          height: 200,
-                          color: Colors.grey[200],
-                          child: const Center(child: CircularProgressIndicator()),
-                        );
-                      },
-                      errorBuilder: (context, error2, stackTrace2) {
-                        print('Failed to load \\${possibleUrls[1]}, error: $error2');
-                        return Image.network(
-                          possibleUrls[2],
-                          fit: BoxFit.contain,
-                          width: double.infinity,
-                          height: double.infinity,
-                          headers: const {
-                            'Accept': 'image/*',
-                          },
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              width: double.infinity,
-                              height: 200,
-                              color: Colors.grey[200],
-                              child: const Center(child: CircularProgressIndicator()),
-                            );
-                          },
-                          errorBuilder: (context, error3, stackTrace3) {
-                            print('All URLs failed: $possibleUrls, final error: $error3');
-                            return Container(
-                              width: double.infinity,
-                              height: 200,
-                              color: Colors.grey[200],
-                              child: const Center(
-                                child: Text(
-                                  'Tidak dapat memuat foto',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
+                      height: 200,
+                      color: Colors.grey[200],
+                      child: const Center(
+                        child: Text(
+                          'Tidak dapat memuat foto',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
                     );
                   },
                 ),

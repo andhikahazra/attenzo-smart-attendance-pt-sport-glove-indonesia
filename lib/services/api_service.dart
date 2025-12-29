@@ -15,7 +15,7 @@ import '../models/location.dart';
 class ApiService {
   ApiService({http.Client? client}) : _client = client ?? http.Client();
 
-  static const String _defaultBaseUrl = 'http://192.168.101.4:8000';
+  static const String _defaultBaseUrl = 'http://:8000';
   final http.Client _client;
 
   // Synchronous getter for backward compatibility
