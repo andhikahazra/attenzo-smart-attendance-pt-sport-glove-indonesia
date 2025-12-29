@@ -31,11 +31,20 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
   final ApiService _api = ApiService();
   late Future<List<AttendanceRecord>> _future;
   String _selectedFilter = 'Semua';
+  String? _baseUrl;
 
   @override
   void initState() {
     super.initState();
     _future = _loadAttendance();
+    _loadBaseUrl();
+  }
+
+  Future<void> _loadBaseUrl() async {
+    final url = await ApiService.getCurrentBaseUrl();
+    setState(() {
+      _baseUrl = url;
+    });
   }
 
   @override
@@ -550,22 +559,22 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
     final raw = record.photoUrl ?? record.photoPath;
     if (raw == null || raw.isEmpty) return null;
     if (raw.startsWith('http')) return raw;
-    // Try different possible paths
+    final base = _baseUrl ?? ApiService.baseUrl;
     final possibleUrls = [
-      '${ApiService.baseUrl}/storage/$raw',
-      '${ApiService.baseUrl}/api/storage/$raw', 
-      '${ApiService.baseUrl}/$raw',
+      '$base/storage/$raw',
+      '$base/api/storage/$raw',
+      '$base/$raw',
     ];
-    // For now, return the first one, but _showPhoto will try all
     return possibleUrls[0];
   }
 
   void _showPhoto(String url) {
+    final base = _baseUrl ?? ApiService.baseUrl;
     // Try different possible URLs
     final possibleUrls = [
       url,
-      url.replaceFirst('/storage/', '/api/storage/'),
-      url.replaceFirst('/storage/', '/'),
+      url.replaceFirst(base + '/storage/', base + '/api/storage/'),
+      url.replaceFirst(base + '/storage/', base + '/'),
     ];
 
     print('Trying photo URLs: $possibleUrls');
@@ -587,7 +596,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                 // Try to load image with fallback
                 Image.network(
                   possibleUrls[0],
-                  fit: BoxFit.contain, // Changed to contain to show full image without cropping
+                  fit: BoxFit.contain,
                   width: double.infinity,
                   height: double.infinity,
                   headers: const {
@@ -603,7 +612,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                     );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    print('Failed to load ${possibleUrls[0]}, error: $error');
+                    print('Failed to load \\${possibleUrls[0]}, error: $error');
                     return Image.network(
                       possibleUrls[1],
                       fit: BoxFit.contain,
@@ -622,7 +631,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                         );
                       },
                       errorBuilder: (context, error2, stackTrace2) {
-                        print('Failed to load ${possibleUrls[1]}, error: $error2');
+                        print('Failed to load \\${possibleUrls[1]}, error: $error2');
                         return Image.network(
                           possibleUrls[2],
                           fit: BoxFit.contain,
