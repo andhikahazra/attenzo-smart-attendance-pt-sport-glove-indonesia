@@ -564,7 +564,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
   }
 
   void _showPhoto(String url) {
-    print('Trying photo URL: $url');
+    // Photo URL: $url
     showDialog<void>(
       context: context,
       builder: (_) => Dialog(
@@ -597,7 +597,7 @@ class _RiwayatScreenState extends State<RiwayatScreen> {
                     );
                   },
                   errorBuilder: (context, error, stackTrace) {
-                    print('Failed to load $url, error: $error');
+                    // Failed to load photo
                     return Container(
                       width: double.infinity,
                       height: 200,

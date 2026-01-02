@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../models/attendance_record.dart';
+import '../services/api_service.dart';
 import '../state/auth_state.dart';
 import '../utils/app_colors.dart';
 import '../widgets/bottom_nav_bar.dart';
@@ -44,10 +46,69 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class HomeContent extends StatelessWidget {
+class HomeContent extends StatefulWidget {
   const HomeContent({super.key, this.userName});
 
   final String? userName;
+
+  @override
+  State<HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends State<HomeContent> {
+  AttendanceRecord? _checkInRecord;
+  AttendanceRecord? _checkOutRecord;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadTodayAttendance();
+  }
+
+  Future<void> _loadTodayAttendance() async {
+    try {
+      final auth = context.read<AuthState>();
+      if (auth.token == null) {
+        return;
+      }
+
+      final apiService = ApiService();
+      final records = await apiService.getAttendanceRecords(token: auth.token!);
+
+      // Get today's date in Jakarta time
+      final now = DateTime.now().toUtc().add(const Duration(hours: 7));
+      final today = DateFormat('yyyy-MM-dd').format(now);
+
+      // Filter today's records
+      final todayRecords = records.where((record) {
+        return record.attendanceDate == today;
+      }).toList();
+
+      // Find check-in and check-out
+      AttendanceRecord? checkIn;
+      AttendanceRecord? checkOut;
+
+      for (var record in todayRecords) {
+        if (record.type.toLowerCase() == 'check-in' ||
+            record.type.toLowerCase() == 'checkin') {
+          checkIn = record;
+        } else if (record.type.toLowerCase() == 'check-out' ||
+            record.type.toLowerCase() == 'checkout') {
+          checkOut = record;
+        }
+      }
+
+      setState(() {
+        _checkInRecord = checkIn;
+        _checkOutRecord = checkOut;
+      });
+    } catch (e) {
+      setState(() {
+        _checkInRecord = null;
+        _checkOutRecord = null;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -67,7 +128,7 @@ class HomeContent extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildTopBar(userName),
+                    _buildTopBar(widget.userName),
                     const SizedBox(height: 24),
                     Text(
                       'Time to do what you do best',
@@ -79,7 +140,7 @@ class HomeContent extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      "What's up, ${userName ?? 'there'}?",
+                      "What's up, ${widget.userName ?? 'there'}?",
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 28,
@@ -87,7 +148,7 @@ class HomeContent extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    _buildCheckInCard(context, userName),
+                    _buildCheckInCard(context, widget.userName),
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -337,29 +398,96 @@ class HomeContent extends StatelessWidget {
   }
 
   Widget _buildOverviewSection() {
+    // Parse check-in data
+    String checkInValue = '--:--';
+    String? checkInSuffix;
+    String checkInSubtitle = 'Belum check in hari ini';
+    String checkInStatus = '--';
+    Color checkInStatusColor = const Color(0xFFE2E8F0);
+    Color checkInStatusTextColor = const Color(0xFF475569);
+
+    if (_checkInRecord != null) {
+      try {
+        // Parse time from attendance_time (format: HH:mm:ss)
+        final timeParts = _checkInRecord!.attendanceTime.split(':');
+        if (timeParts.length >= 2) {
+          final hour = int.parse(timeParts[0]);
+          final minute = timeParts[1];
+          final hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+          checkInValue = '$hour12:$minute';
+          checkInSuffix = hour >= 12 ? 'PM' : 'AM';
+        }
+        checkInSubtitle = 'Checked in success';
+
+        // Set status based on record status
+        if (_checkInRecord!.status.toLowerCase() == 'on time' ||
+            _checkInRecord!.status.toLowerCase() == 'ontime') {
+          checkInStatus = 'On time';
+          checkInStatusColor = const Color(0xFFDCFCE7);
+          checkInStatusTextColor = const Color(0xFF166534);
+        } else if (_checkInRecord!.status.toLowerCase() == 'late' ||
+            _checkInRecord!.status.toLowerCase() == 'terlambat') {
+          checkInStatus = 'Late';
+          checkInStatusColor = const Color(0xFFFFF7ED);
+          checkInStatusTextColor = const Color(0xFFC2410C);
+        }
+      } catch (e) {
+        // Keep default values if parsing fails
+      }
+    }
+
+    // Parse check-out data
+    String checkOutValue = '--:--';
+    String? checkOutSuffix;
+    String checkOutSubtitle = "Belum check out";
+    String checkOutStatus = 'n/a';
+    Color checkOutStatusColor = const Color(0xFFE2E8F0);
+    Color checkOutStatusTextColor = const Color(0xFF475569);
+
+    if (_checkOutRecord != null) {
+      try {
+        // Parse time from attendance_time (format: HH:mm:ss)
+        final timeParts = _checkOutRecord!.attendanceTime.split(':');
+        if (timeParts.length >= 2) {
+          final hour = int.parse(timeParts[0]);
+          final minute = timeParts[1];
+          final hour12 = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+          checkOutValue = '$hour12:$minute';
+          checkOutSuffix = hour >= 12 ? 'PM' : 'AM';
+        }
+        checkOutSubtitle = 'Checked out success';
+        checkOutStatus = 'Done';
+        checkOutStatusColor = const Color(0xFFDCFCE7);
+        checkOutStatusTextColor = const Color(0xFF166534);
+      } catch (e) {
+        // Keep default values if parsing fails
+      }
+    }
+
     final cards = <_OverviewCardData>[
       _OverviewCardData(
         icon: Icons.logout_rounded,
         iconBackground: const Color(0xFFE0E7FF),
         iconColor: const Color(0xFF4338CA),
         title: 'Check in',
-        value: _getCurrentTime(),
-        valueSuffix: _getTimePeriod(),
-        subtitle: 'Belum check in hari ini',
-        statusLabel: '--',
-        statusColor: const Color(0xFFE2E8F0),
-        statusTextColor: const Color(0xFF475569),
+        value: checkInValue,
+        valueSuffix: checkInSuffix,
+        subtitle: checkInSubtitle,
+        statusLabel: checkInStatus,
+        statusColor: checkInStatusColor,
+        statusTextColor: checkInStatusTextColor,
       ),
       _OverviewCardData(
         icon: Icons.login_rounded,
         iconBackground: const Color(0xFFE2E8F0),
         iconColor: const Color(0xFF1E293B),
         title: 'Check out',
-        value: '--:--',
-        subtitle: "It's not time yet",
-        statusLabel: 'n/a',
-        statusColor: const Color(0xFFE2E8F0),
-        statusTextColor: const Color(0xFF475569),
+        value: checkOutValue,
+        valueSuffix: checkOutSuffix,
+        subtitle: checkOutSubtitle,
+        statusLabel: checkOutStatus,
+        statusColor: checkOutStatusColor,
+        statusTextColor: checkOutStatusTextColor,
       ),
     ];
 
@@ -556,20 +684,6 @@ class HomeContent extends StatelessWidget {
       const Duration(hours: 7),
     ); // Jakarta time (UTC+7)
     return DateFormat('EEE, MMM dd yyyy').format(now);
-  }
-
-  static String _getCurrentTime() {
-    final now = DateTime.now().toUtc().add(
-      const Duration(hours: 7),
-    ); // Jakarta time (UTC+7)
-    return DateFormat('hh:mm').format(now);
-  }
-
-  static String _getTimePeriod() {
-    final now = DateTime.now().toUtc().add(
-      const Duration(hours: 7),
-    ); // Jakarta time (UTC+7)
-    return DateFormat('a').format(now);
   }
 
   Widget _buildOverviewCard(_OverviewCardData data) {
