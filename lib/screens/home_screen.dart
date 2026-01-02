@@ -58,14 +58,24 @@ class HomeContent extends StatefulWidget {
 class _HomeContentState extends State<HomeContent> {
   AttendanceRecord? _checkInRecord;
   AttendanceRecord? _checkOutRecord;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadTodayAttendance();
+    // Load after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadTodayAttendance();
+    });
   }
 
   Future<void> _loadTodayAttendance() async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final auth = context.read<AuthState>();
       if (auth.token == null) {
@@ -89,24 +99,37 @@ class _HomeContentState extends State<HomeContent> {
       AttendanceRecord? checkOut;
 
       for (var record in todayRecords) {
-        if (record.type.toLowerCase() == 'check-in' ||
-            record.type.toLowerCase() == 'checkin') {
+        final typeLC = record.type.toLowerCase();
+        if (typeLC == 'check-in' ||
+            typeLC == 'check_in' ||
+            typeLC == 'checkin' ||
+            typeLC == 'check in' ||
+            typeLC == 'masuk') {
           checkIn = record;
-        } else if (record.type.toLowerCase() == 'check-out' ||
-            record.type.toLowerCase() == 'checkout') {
+        } else if (typeLC == 'check-out' ||
+            typeLC == 'check_out' ||
+            typeLC == 'checkout' ||
+            typeLC == 'check out' ||
+            typeLC == 'keluar') {
           checkOut = record;
         }
       }
 
-      setState(() {
-        _checkInRecord = checkIn;
-        _checkOutRecord = checkOut;
-      });
+      if (mounted) {
+        setState(() {
+          _checkInRecord = checkIn;
+          _checkOutRecord = checkOut;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _checkInRecord = null;
-        _checkOutRecord = null;
-      });
+      if (mounted) {
+        setState(() {
+          _checkInRecord = null;
+          _checkOutRecord = null;
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -116,45 +139,53 @@ class _HomeContentState extends State<HomeContent> {
     return SafeArea(
       child: Container(
         color: background,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 24,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTopBar(widget.userName),
-                    const SizedBox(height: 24),
-                    Text(
-                      'Time to do what you do best',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+        child: RefreshIndicator(
+          onRefresh: () async {
+            await _loadTodayAttendance();
+          },
+          color: Colors.white,
+          backgroundColor: const Color(0xFF0F172A),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 24,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTopBar(widget.userName),
+                      const SizedBox(height: 24),
+                      Text(
+                        'Time to do what you do best',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.65),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "What's up, ${widget.userName ?? 'there'}?",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(height: 6),
+                      Text(
+                        "What's up, ${widget.userName ?? 'there'}?",
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 28,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 28),
-                    _buildCheckInCard(context, widget.userName),
-                    const SizedBox(height: 32),
-                  ],
+                      const SizedBox(height: 28),
+                      _buildCheckInCard(context, widget.userName),
+                      const SizedBox(height: 32),
+                    ],
+                  ),
                 ),
-              ),
-              _buildDashboardSection(context),
-            ],
+                _buildDashboardSection(context),
+              ],
+            ),
           ),
         ),
       ),
@@ -552,40 +583,92 @@ class _HomeContentState extends State<HomeContent> {
   }
 
   Widget _buildRecentActivitySection(BuildContext context) {
-    final activities = <_RecentActivityData>[
-      _RecentActivityData(
-        icon: Icons.logout_rounded,
-        title: 'Team standup',
-        subtitle: '08:30 AM | Zoom meeting',
-        status: 'Completed',
-        statusColor: const Color(0xFFE0F2FE),
-        statusTextColor: const Color(0xFF0C4A6E),
-      ),
-      _RecentActivityData(
-        icon: Icons.login_rounded,
-        title: 'Check in',
-        subtitle: '09:10 AM | HQ lobby',
-        status: 'On time',
-        statusColor: const Color(0xFFDCFCE7),
-        statusTextColor: const Color(0xFF166534),
-      ),
-      _RecentActivityData(
-        icon: Icons.coffee_rounded,
-        title: 'Coffee break',
-        subtitle: '11:40 AM | Pantry',
-        status: 'Ongoing',
-        statusColor: const Color(0xFFFDE68A),
-        statusTextColor: const Color(0xFF854D0E),
-      ),
-      _RecentActivityData(
-        icon: Icons.logout_rounded,
-        title: 'Check out',
-        subtitle: '--:-- | Pending checkout',
-        status: 'Pending',
-        statusColor: const Color(0xFFFFF7ED),
-        statusTextColor: const Color(0xFFC2410C),
-      ),
-    ];
+    final activities = <_RecentActivityData>[];
+
+    // Add check-in activity if exists
+    if (_checkInRecord != null) {
+      final checkInTime = _checkInRecord!.attendanceTime.isNotEmpty
+          ? DateFormat('hh:mm a').format(
+              DateTime.parse(
+                '${_checkInRecord!.attendanceDate} ${_checkInRecord!.attendanceTime}',
+              ),
+            )
+          : '--:--';
+
+      activities.add(
+        _RecentActivityData(
+          icon: Icons.login_rounded,
+          title: 'Check in',
+          subtitle: checkInTime,
+          status: _checkInRecord!.status,
+          statusColor: const Color(0xFFDCFCE7),
+          statusTextColor: const Color(0xFF166534),
+        ),
+      );
+    }
+
+    // Add check-out activity if exists
+    if (_checkOutRecord != null) {
+      final checkOutTime = _checkOutRecord!.attendanceTime.isNotEmpty
+          ? DateFormat('hh:mm a').format(
+              DateTime.parse(
+                '${_checkOutRecord!.attendanceDate} ${_checkOutRecord!.attendanceTime}',
+              ),
+            )
+          : '--:--';
+
+      activities.add(
+        _RecentActivityData(
+          icon: Icons.logout_rounded,
+          title: 'Check out',
+          subtitle: checkOutTime,
+          status: _checkOutRecord!.status,
+          statusColor: const Color(0xFFE0F2FE),
+          statusTextColor: const Color(0xFF0C4A6E),
+        ),
+      );
+    }
+
+    // If no activities, show empty state
+    if (activities.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Recent Activity',
+            style: TextStyle(
+              color: Color(0xFF0F172A),
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 32),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.history_rounded,
+                    size: 48,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'No activity yet today',
+                    style: TextStyle(
+                      color: const Color(0xFF64748B),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
