@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../state/auth_state.dart';
@@ -258,7 +259,10 @@ class HomeContent extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  Divider(color: Colors.white.withValues(alpha: 0.2), height: 1),
+                  Divider(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    height: 1,
+                  ),
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -339,11 +343,12 @@ class HomeContent extends StatelessWidget {
         iconBackground: const Color(0xFFE0E7FF),
         iconColor: const Color(0xFF4338CA),
         title: 'Check in',
-        value: '09:10',
-        valueSuffix: 'AM',
-        subtitle: 'Checked in success',
-        statusLabel: 'On time',
-        statusColor: const Color(0xFFF97316),
+        value: _getCurrentTime(),
+        valueSuffix: _getTimePeriod(),
+        subtitle: 'Belum check in hari ini',
+        statusLabel: '--',
+        statusColor: const Color(0xFFE2E8F0),
+        statusTextColor: const Color(0xFF475569),
       ),
       _OverviewCardData(
         icon: Icons.login_rounded,
@@ -355,26 +360,6 @@ class HomeContent extends StatelessWidget {
         statusLabel: 'n/a',
         statusColor: const Color(0xFFE2E8F0),
         statusTextColor: const Color(0xFF475569),
-      ),
-      _OverviewCardData(
-        icon: Icons.coffee_rounded,
-        iconBackground: const Color(0xFFFDE68A),
-        iconColor: const Color(0xFFB45309),
-        title: 'Break',
-        value: '11:40',
-        valueSuffix: 'AM',
-        subtitle: 'Break ongoing',
-        statusLabel: 'Too Early',
-        statusColor: const Color(0xFFEF4444),
-      ),
-      _OverviewCardData(
-        icon: Icons.timelapse_rounded,
-        iconBackground: const Color(0xFFE0F2FE),
-        iconColor: const Color(0xFF0369A1),
-        title: 'Overtime',
-        value: 'Total',
-        valueSuffix: '8 Hour',
-        subtitle: 'Update, Jul 18 2024',
       ),
     ];
 
@@ -401,15 +386,15 @@ class HomeContent extends StatelessWidget {
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
               child: Row(
-                children: const [
-                  Icon(
+                children: [
+                  const Icon(
                     Icons.calendar_today_rounded,
                     size: 16,
                     color: Color(0xFF64748B),
                   ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Text(
-                    'Wed, Jul 22 2024',
+                    _getFormattedDate(),
                     style: TextStyle(
                       color: Color(0xFF475569),
                       fontSize: 12,
@@ -477,49 +462,13 @@ class HomeContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text(
-              'Recent Activity',
-              style: TextStyle(
-                color: Color(0xFF0F172A),
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const RiwayatScreenPage(),
-                  ),
-                );
-              },
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                foregroundColor: const Color(0xFF1D4ED8),
-                backgroundColor: const Color(0xFFEFF6FF),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Row(
-                children: const [
-                  Text(
-                    'See all',
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                  ),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 16),
-                ],
-              ),
-            ),
-          ],
+        const Text(
+          'Recent Activity',
+          style: TextStyle(
+            color: Color(0xFF0F172A),
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
         ),
         const SizedBox(height: 20),
         ListView.separated(
@@ -600,6 +549,27 @@ class HomeContent extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _getFormattedDate() {
+    final now = DateTime.now().toUtc().add(
+      const Duration(hours: 7),
+    ); // Jakarta time (UTC+7)
+    return DateFormat('EEE, MMM dd yyyy').format(now);
+  }
+
+  static String _getCurrentTime() {
+    final now = DateTime.now().toUtc().add(
+      const Duration(hours: 7),
+    ); // Jakarta time (UTC+7)
+    return DateFormat('hh:mm').format(now);
+  }
+
+  static String _getTimePeriod() {
+    final now = DateTime.now().toUtc().add(
+      const Duration(hours: 7),
+    ); // Jakarta time (UTC+7)
+    return DateFormat('a').format(now);
   }
 
   Widget _buildOverviewCard(_OverviewCardData data) {
