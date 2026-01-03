@@ -50,13 +50,18 @@ class ApiService {
     return headers;
   }
 
-  Future<LoginResponse> login({required String email, required String password}) async {
+  Future<LoginResponse> login({
+    required String email,
+    required String password,
+  }) async {
     final url = await _uri('/api/login');
     try {
       final response = await _client
           .post(
             url,
-            headers: _headers(extra: {HttpHeaders.contentTypeHeader: 'application/json'}),
+            headers: _headers(
+              extra: {HttpHeaders.contentTypeHeader: 'application/json'},
+            ),
             body: jsonEncode({'email': email, 'password': password}),
           )
           .timeout(const Duration(seconds: 15));
@@ -87,7 +92,9 @@ class ApiService {
       final response = await _client
           .post(
             url,
-            headers: _headers(extra: {HttpHeaders.contentTypeHeader: 'application/json'}),
+            headers: _headers(
+              extra: {HttpHeaders.contentTypeHeader: 'application/json'},
+            ),
             body: jsonEncode({
               'name': name,
               'email': email,
@@ -127,7 +134,9 @@ class ApiService {
       headers: _headers(token: token),
     );
     _ensureSuccess(response);
-    return FacePhotosData.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    return FacePhotosData.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
   }
 
   /// Register/encode face photos (exactly 5) via /api/face-photos/encode using images[] multipart.
@@ -136,11 +145,15 @@ class ApiService {
     required List<File> photos,
   }) async {
     final baseUrl = await _getBaseUrl();
-    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/api/face-photos/encode'))
-      ..headers.addAll(_headers(token: token));
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$baseUrl/api/face-photos/encode'),
+    )..headers.addAll(_headers(token: token));
 
     for (final file in photos) {
-      request.files.add(await http.MultipartFile.fromPath('images[]', file.path));
+      request.files.add(
+        await http.MultipartFile.fromPath('images[]', file.path),
+      );
     }
 
     final streamed = await request.send();
@@ -161,10 +174,7 @@ class ApiService {
         token: token,
         extra: {HttpHeaders.contentTypeHeader: 'application/json'},
       ),
-      body: jsonEncode({
-        'user_id': userId,
-        'photo_path': photoPaths,
-      }),
+      body: jsonEncode({'user_id': userId, 'photo_path': photoPaths}),
     );
     _ensureSuccess(response);
   }
@@ -180,10 +190,7 @@ class ApiService {
         token: token,
         extra: {HttpHeaders.contentTypeHeader: 'application/json'},
       ),
-      body: jsonEncode({
-        'user_id': userId,
-        'face_embed': faceEmbed,
-      }),
+      body: jsonEncode({'user_id': userId, 'face_embed': faceEmbed}),
     );
     _ensureSuccess(response);
     final data = jsonDecode(response.body) as Map<String, dynamic>;
@@ -199,13 +206,16 @@ class ApiService {
     required File photoFile,
   }) async {
     final baseUrl = await _getBaseUrl();
-    final request = http.MultipartRequest('POST', Uri.parse('$baseUrl/api/attendance'))
-      ..headers.addAll(_headers(token: token))
-      ..fields['type'] = type
-      ..fields['attendance_date'] = attendanceDate
-      ..fields['attendance_time'] = attendanceTime;
+    final request =
+        http.MultipartRequest('POST', Uri.parse('$baseUrl/api/attendance'))
+          ..headers.addAll(_headers(token: token))
+          ..fields['type'] = type
+          ..fields['attendance_date'] = attendanceDate
+          ..fields['attendance_time'] = attendanceTime;
 
-    request.files.add(await http.MultipartFile.fromPath('photo', photoFile.path));
+    request.files.add(
+      await http.MultipartFile.fromPath('photo', photoFile.path),
+    );
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
@@ -220,14 +230,23 @@ class ApiService {
   /// Get today's attendance status (can_check_in, can_check_out, status)
   Future<Map<String, dynamic>> getTodayStatus({
     required String token,
+    String? date, // Optional date parameter in YYYY-MM-DD format
   }) async {
-    final response = await _client.get(
-      await _uri('/api/attendance/today-status'),
-      headers: _headers(token: token),
-    );
+    // If no date provided, use current date
+    final now = DateTime.now();
+    final dateParam =
+        date ??
+        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    final uri = await _uri('/api/attendance/today-status?date=$dateParam');
+    debugPrint('🔍 Fetching today status for date: $dateParam');
+    debugPrint('🔍 Request URI: $uri');
+
+    final response = await _client.get(uri, headers: _headers(token: token));
 
     _ensureSuccess(response);
     final data = jsonDecode(response.body);
+    debugPrint('🔍 Backend response: $data');
     return data is Map<String, dynamic> ? data : <String, dynamic>{};
   }
 
@@ -244,7 +263,10 @@ class ApiService {
 
     List<dynamic> rawList;
     if (body is Map<String, dynamic>) {
-      rawList = (body['data'] as List?) ?? (body['attendance'] as List?) ?? <dynamic>[];
+      rawList =
+          (body['data'] as List?) ??
+          (body['attendance'] as List?) ??
+          <dynamic>[];
     } else if (body is List) {
       rawList = body;
     } else {
@@ -265,7 +287,7 @@ class ApiService {
 
     _ensureSuccess(response);
     final body = jsonDecode(response.body);
-    
+
     // Debug logging
     debugPrint('Locations API Response: $body');
 
@@ -277,10 +299,14 @@ class ApiService {
     } else if (body is Map<String, dynamic>) {
       // Response is object, check for data/locations key
       if (body['data'] is List) {
-        debugPrint('Response has data array with ${(body['data'] as List).length} items');
+        debugPrint(
+          'Response has data array with ${(body['data'] as List).length} items',
+        );
         rawList = body['data'] as List;
       } else if (body['locations'] is List) {
-        debugPrint('Response has locations array with ${(body['locations'] as List).length} items');
+        debugPrint(
+          'Response has locations array with ${(body['locations'] as List).length} items',
+        );
         rawList = body['locations'] as List;
       } else if (body['data'] is Map<String, dynamic>) {
         // Single location wrapped in data object
@@ -310,25 +336,27 @@ class ApiService {
       if (message.contains('Face could not be detected')) {
         throw HttpException(message, uri: response.request?.url);
       }
-      if (message.contains('face service error') || message.contains('Face service error')) {
+      if (message.contains('face service error') ||
+          message.contains('Face service error')) {
         // Try to extract details from response
         try {
           final body = jsonDecode(response.body);
           if (body is Map<String, dynamic> && body['details'] != null) {
             final details = body['details'];
-            if (details is String && details.contains('Face could not be detected')) {
+            if (details is String &&
+                details.contains('Face could not be detected')) {
               throw HttpException(details, uri: response.request?.url);
             }
             if (details is Map && details['message'] is String) {
-              throw HttpException(details['message'], uri: response.request?.url);
+              throw HttpException(
+                details['message'],
+                uri: response.request?.url,
+              );
             }
           }
         } catch (_) {}
       }
-      throw HttpException(
-        message,
-        uri: response.request?.url,
-      );
+      throw HttpException(message, uri: response.request?.url);
     }
   }
 
@@ -336,7 +364,9 @@ class ApiService {
     // Debug log to help diagnose backend responses during development.
     // Remove or guard with a debug flag if needed.
     // ignore: avoid_print
-    print('[API] $method ${url.toString()} -> ${response.statusCode} ${response.reasonPhrase}');
+    print(
+      '[API] $method ${url.toString()} -> ${response.statusCode} ${response.reasonPhrase}',
+    );
     // ignore: avoid_print
     print('[API] body: ${response.body}');
   }
