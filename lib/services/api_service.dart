@@ -11,6 +11,7 @@ import '../models/face_photos.dart';
 import '../models/login_response.dart';
 import '../models/user.dart';
 import '../models/location.dart';
+import '../models/shift.dart';
 
 class ApiService {
   ApiService({http.Client? client}) : _client = client ?? http.Client();
@@ -248,6 +249,31 @@ class ApiService {
     final data = jsonDecode(response.body);
     debugPrint('🔍 Backend response: $data');
     return data is Map<String, dynamic> ? data : <String, dynamic>{};
+  }
+
+  /// Get user's shift information
+  Future<Shift?> getShift({required String token}) async {
+    final uri = await _uri('/api/shift');
+    debugPrint('🔍 Fetching shift data');
+    debugPrint('🔍 Request URI: $uri');
+
+    try {
+      final response = await _client.get(uri, headers: _headers(token: token));
+
+      _ensureSuccess(response);
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      debugPrint('🔍 Shift response: $body');
+
+      if (body['status'] == 'success' && body['data'] != null) {
+        return Shift.fromJson(body['data'] as Map<String, dynamic>);
+      } else {
+        debugPrint('⚠️ Shift error: ${body['message']}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching shift: $e');
+      return null;
+    }
   }
 
   Future<List<AttendanceRecord>> getAttendanceRecords({

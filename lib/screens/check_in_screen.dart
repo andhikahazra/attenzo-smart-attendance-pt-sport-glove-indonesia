@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import 'dart:async';
 
 import '../models/location.dart';
+import '../models/shift.dart';
 import '../services/api_service.dart';
 import '../state/auth_state.dart';
 
@@ -44,6 +45,11 @@ class _CheckInScreenState extends State<CheckInScreen>
   String? _locationWarning;
   bool _hasShownLocationWarning = false; // Track if warning has been shown
 
+  // Shift data from backend
+  Shift? _shift;
+  bool _isLoadingShift = true;
+  String? _shiftError;
+
   @override
   void initState() {
     super.initState();
@@ -52,10 +58,50 @@ class _CheckInScreenState extends State<CheckInScreen>
     _initializeLocationValidation();
     // Delay status check to ensure context is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchShiftData();
       _fetchTodayStatus();
       _updateTime();
       _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
     });
+  }
+
+  Future<void> _fetchShiftData() async {
+    final auth = context.read<AuthState>();
+    final token = auth.token;
+
+    if (token == null) {
+      setState(() {
+        _isLoadingShift = false;
+        _shiftError = 'Token tidak tersedia';
+      });
+      return;
+    }
+
+    try {
+      final shift = await _api.getShift(token: token);
+
+      setState(() {
+        _shift = shift;
+        _isLoadingShift = false;
+        if (shift == null) {
+          _shiftError = 'Anda belum memiliki shift';
+        }
+      });
+
+      // Show dialog if no shift assigned
+      if (shift == null && mounted) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (mounted) {
+          _showNoShiftDialog();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching shift data: $e');
+      setState(() {
+        _isLoadingShift = false;
+        _shiftError = 'Gagal memuat data shift';
+      });
+    }
   }
 
   Future<void> _initializeLocationValidation() async {
@@ -156,6 +202,100 @@ class _CheckInScreenState extends State<CheckInScreen>
     }
   }
 
+  void _showNoShiftDialog() {
+    if (!mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 40,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.warning_rounded,
+                    size: 40,
+                    color: Color(0xFFD97706),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Shift Belum Ditentukan',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Anda belum memiliki shift kerja.\\n\\nSilakan hubungi admin untuk mengatur shift Anda.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF6B7280),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Kembali ke Home',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _showAttendanceCompletedDialog() {
     if (!mounted) return;
 
@@ -254,6 +394,19 @@ class _CheckInScreenState extends State<CheckInScreen>
     if (!mounted) return;
 
     final isCheckIn = type == 'check_in';
+    String? maxTime;
+
+    if (_shift != null) {
+      if (isCheckIn) {
+        final maxCheckinTime = _shift!.getMaxCheckinTime(DateTime.now());
+        maxTime =
+            '${maxCheckinTime.hour.toString().padLeft(2, '0')}:${maxCheckinTime.minute.toString().padLeft(2, '0')}';
+      } else {
+        final maxCheckoutTime = _shift!.getMaxCheckoutTime(DateTime.now());
+        maxTime =
+            '${maxCheckoutTime.hour.toString().padLeft(2, '0')}:${maxCheckoutTime.minute.toString().padLeft(2, '0')}';
+      }
+    }
 
     showDialog<void>(
       context: context,
@@ -303,8 +456,12 @@ class _CheckInScreenState extends State<CheckInScreen>
                 const SizedBox(height: 8),
                 Text(
                   isCheckIn
-                      ? 'Waktu untuk check-in hari ini sudah terlewat.\n\nSilakan hubungi admin untuk informasi lebih lanjut.'
-                      : 'Waktu untuk check-out hari ini sudah terlewat.\n\nSilakan hubungi admin untuk informasi lebih lanjut.',
+                      ? maxTime != null
+                            ? 'Waktu maksimal check-in adalah pukul $maxTime.\\n\\nAnda sudah melewati batas waktu. Silakan hubungi admin untuk informasi lebih lanjut.'
+                            : 'Waktu untuk check-in hari ini sudah terlewat.\\n\\nSilakan hubungi admin untuk informasi lebih lanjut.'
+                      : maxTime != null
+                      ? 'Waktu maksimal check-out adalah pukul $maxTime.\\n\\nAnda sudah melewati batas waktu. Silakan hubungi admin untuk informasi lebih lanjut.'
+                      : 'Waktu untuk check-out hari ini sudah terlewat.\\n\\nSilakan hubungi admin untuk informasi lebih lanjut.',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -333,6 +490,121 @@ class _CheckInScreenState extends State<CheckInScreen>
                     ),
                     child: const Text(
                       'Kembali ke Home',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showTooEarlyDialog(String type) {
+    if (!mounted) return;
+
+    final isCheckIn = type == 'check_in';
+    String? earlyTime;
+    String shiftInfo = '';
+
+    if (_shift != null) {
+      if (isCheckIn) {
+        final earlyCheckinTime = _shift!.getEarlyCheckinTime(DateTime.now());
+        earlyTime =
+            '${earlyCheckinTime.hour.toString().padLeft(2, '0')}:${earlyCheckinTime.minute.toString().padLeft(2, '0')}';
+        shiftInfo =
+            'Shift ${_shift!.name}\\nJam Kerja: ${_shift!.formatTime(_shift!.startTime)} - ${_shift!.formatTime(_shift!.endTime)}';
+      } else {
+        final earlyCheckoutTime = _shift!.getEarlyCheckoutTime(DateTime.now());
+        earlyTime =
+            '${earlyCheckoutTime.hour.toString().padLeft(2, '0')}:${earlyCheckoutTime.minute.toString().padLeft(2, '0')}';
+        shiftInfo =
+            'Shift ${_shift!.name}\\nJam Kerja: ${_shift!.formatTime(_shift!.startTime)} - ${_shift!.formatTime(_shift!.endTime)}';
+      }
+    }
+
+    final timeLabel = isCheckIn ? 'check-in' : 'check-out';
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 40,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.schedule_rounded,
+                    size: 40,
+                    color: Color(0xFF2563EB),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Belum Waktu Absen',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  earlyTime != null && shiftInfo.isNotEmpty
+                      ? 'Anda mencoba $timeLabel terlalu cepat.\\n\\n$shiftInfo\\n\\nWaktu $timeLabel dimulai pukul $earlyTime.\\n\\nSilakan coba lagi nanti.'
+                      : 'Anda mencoba $timeLabel terlalu cepat.\\n\\nSilakan coba lagi nanti.',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF6B7280),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'OK',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -780,6 +1052,9 @@ class _CheckInScreenState extends State<CheckInScreen>
 
     final controller = _cameraController;
     if (controller == null || !controller.value.isInitialized) {
+      setState(() {
+        _isPosting = false;
+      });
       _showStatusDialog(
         'Kamera belum siap untuk mengambil foto.',
         isError: true,
@@ -791,6 +1066,9 @@ class _CheckInScreenState extends State<CheckInScreen>
     final token = auth.token;
     final user = auth.user;
     if (token == null || user == null) {
+      setState(() {
+        _isPosting = false;
+      });
       _showStatusDialog('Silakan login ulang untuk absen.', isError: true);
       return;
     }
@@ -810,6 +1088,89 @@ class _CheckInScreenState extends State<CheckInScreen>
         _isPosting = false;
       });
       return;
+    }
+
+    // Check if shift data is available and validate time
+    if (_shift != null) {
+      final now = DateTime.now();
+
+      debugPrint('=== SHIFT TIME VALIDATION ===');
+      debugPrint('Current time: ${now.hour}:${now.minute}:${now.second}');
+      debugPrint('Action type: $type');
+      debugPrint('Shift: ${_shift!.name}');
+
+      if (type == 'check_in') {
+        // Check if too early for check-in
+        final earlyCheckinTime = _shift!.getEarlyCheckinTime(now);
+        debugPrint(
+          'Early check-in time: ${earlyCheckinTime.hour}:${earlyCheckinTime.minute}',
+        );
+        debugPrint('Is before early time: ${now.isBefore(earlyCheckinTime)}');
+
+        if (now.isBefore(earlyCheckinTime)) {
+          debugPrint('❌ TOO EARLY FOR CHECK-IN');
+          setState(() {
+            _isPosting = false;
+          });
+          _showTooEarlyDialog(type);
+          return;
+        }
+
+        // Check if too late for check-in
+        final maxCheckinTime = _shift!.getMaxCheckinTime(now);
+        debugPrint(
+          'Max check-in time: ${maxCheckinTime.hour}:${maxCheckinTime.minute}',
+        );
+        debugPrint('Is after max time: ${now.isAfter(maxCheckinTime)}');
+        debugPrint('Can check in: $_canCheckIn');
+
+        if (now.isAfter(maxCheckinTime) && !_canCheckIn) {
+          debugPrint('❌ TOO LATE FOR CHECK-IN');
+          setState(() {
+            _isPosting = false;
+          });
+          _showAttendanceNotAllowedDialog(type);
+          return;
+        }
+      } else if (type == 'check_out') {
+        // Check if too early for check-out
+        final earlyCheckoutTime = _shift!.getEarlyCheckoutTime(now);
+        debugPrint(
+          'Early check-out time: ${earlyCheckoutTime.hour}:${earlyCheckoutTime.minute}',
+        );
+        debugPrint('Is before early time: ${now.isBefore(earlyCheckoutTime)}');
+
+        if (now.isBefore(earlyCheckoutTime)) {
+          debugPrint('❌ TOO EARLY FOR CHECK-OUT');
+          setState(() {
+            _isPosting = false;
+          });
+          _showTooEarlyDialog(type);
+          return;
+        }
+
+        // Check if too late for check-out
+        final maxCheckoutTime = _shift!.getMaxCheckoutTime(now);
+        debugPrint(
+          'Max check-out time: ${maxCheckoutTime.hour}:${maxCheckoutTime.minute}',
+        );
+        debugPrint('Is after max time: ${now.isAfter(maxCheckoutTime)}');
+        debugPrint('Can check out: $_canCheckOut');
+
+        if (now.isAfter(maxCheckoutTime) && !_canCheckOut) {
+          debugPrint('❌ TOO LATE FOR CHECK-OUT');
+          setState(() {
+            _isPosting = false;
+          });
+          _showAttendanceNotAllowedDialog(type);
+          return;
+        }
+      }
+
+      debugPrint('✅ TIME VALIDATION PASSED');
+      debugPrint('============================');
+    } else {
+      debugPrint('⚠️ No shift data available, skipping time validation');
     }
 
     final now = DateTime.now();
