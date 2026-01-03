@@ -44,6 +44,7 @@ class _CheckInScreenState extends State<CheckInScreen>
   String _locationStatus = 'Memeriksa lokasi...';
   String? _locationWarning;
   bool _hasShownLocationWarning = false; // Track if warning has been shown
+  bool _hasShownTimingDialog = false; // Track if timing dialog has been shown
 
   // Shift data from backend
   Shift? _shift;
@@ -225,7 +226,7 @@ class _CheckInScreenState extends State<CheckInScreen>
   }
 
   void _validateAttendanceTiming() {
-    if (!mounted || _shift == null) return;
+    if (!mounted || _shift == null || _hasShownTimingDialog) return;
 
     final now = DateTime.now();
     final shift = _shift!;
@@ -246,6 +247,7 @@ class _CheckInScreenState extends State<CheckInScreen>
     // Check if user is trying to check-in too early
     if (_attendanceStatus == 'not_checked_in' && now.isBefore(earlyCheckinTime)) {
       debugPrint('⚠️ Too early for check-in!');
+      _hasShownTimingDialog = true;
       _showEarlyAttendanceDialog('check_in', earlyCheckinTime);
       return;
     }
@@ -253,6 +255,7 @@ class _CheckInScreenState extends State<CheckInScreen>
     // Check if user is trying to check-out too early
     if (_attendanceStatus == 'checked_in' && now.isBefore(earlyCheckoutTime)) {
       debugPrint('⚠️ Too early for check-out!');
+      _hasShownTimingDialog = true;
       _showEarlyAttendanceDialog('check_out', earlyCheckoutTime);
       return;
     }
