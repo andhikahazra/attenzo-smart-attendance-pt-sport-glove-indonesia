@@ -15,7 +15,7 @@ import '../models/location.dart';
 class ApiService {
   ApiService({http.Client? client}) : _client = client ?? http.Client();
 
-  static const String _defaultBaseUrl = 'http://:8000';
+  static const String _defaultBaseUrl = '';
   final http.Client _client;
 
   // Synchronous getter for backward compatibility
@@ -215,6 +215,20 @@ class ApiService {
         ? (data['data'] as Map<String, dynamic>? ?? data)
         : <String, dynamic>{};
     return AttendanceRecord.fromJson(map);
+  }
+
+  /// Get today's attendance status (can_check_in, can_check_out, status)
+  Future<Map<String, dynamic>> getTodayStatus({
+    required String token,
+  }) async {
+    final response = await _client.get(
+      await _uri('/api/attendance/today-status'),
+      headers: _headers(token: token),
+    );
+
+    _ensureSuccess(response);
+    final data = jsonDecode(response.body);
+    return data is Map<String, dynamic> ? data : <String, dynamic>{};
   }
 
   Future<List<AttendanceRecord>> getAttendanceRecords({

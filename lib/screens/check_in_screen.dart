@@ -26,8 +26,12 @@ class _CheckInScreenState extends State<CheckInScreen>
   String? _cameraError;
   bool _permissionPermanentlyDenied = false;
   bool _isCheckedIn = false;
+  bool _canCheckIn = true;
+  bool _canCheckOut = false;
+  String _attendanceStatus = 'not_checked_in';
   String _displayTime = '';
   bool _isPosting = false;
+  bool _isLoadingStatus = true;
   final ApiService _api = ApiService();
   Timer? _timer;
 
@@ -45,6 +49,7 @@ class _CheckInScreenState extends State<CheckInScreen>
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
     _initializeLocationValidation();
+    _fetchTodayStatus();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _updateTime();
       _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
@@ -54,6 +59,34 @@ class _CheckInScreenState extends State<CheckInScreen>
   Future<void> _initializeLocationValidation() async {
     await _fetchOfficeLocations();
     await _validateUserLocation();
+  }
+
+  Future<void> _fetchTodayStatus() async {
+    final auth = context.read<AuthState>();
+    final token = auth.token;
+
+    if (token == null) {
+      setState(() {
+        _isLoadingStatus = false;
+      });
+      return;
+    }
+
+    try {
+      final statusData = await _api.getTodayStatus(token: token);
+      setState(() {
+        _canCheckIn = statusData['can_check_in'] as bool? ?? false;
+        _canCheckOut = statusData['can_check_out'] as bool? ?? false;
+        _attendanceStatus = statusData['status'] as String? ?? 'not_checked_in';
+        _isCheckedIn = _attendanceStatus == 'checked_in' || _attendanceStatus == 'completed';
+        _isLoadingStatus = false;
+      });
+    } catch (e) {
+      debugPrint('Error fetching today status: $e');
+      setState(() {
+        _isLoadingStatus = false;
+      });
+    }
   }
 
   Future<void> _fetchOfficeLocations() async {
@@ -411,7 +444,7 @@ class _CheckInScreenState extends State<CheckInScreen>
                             onActionTap: _handleCheckAction,
                             displayTime: _displayTime,
                             isCheckedIn: _isCheckedIn,
-                            isLoading: _isPosting,
+                            isLoading: _isPosting || _isLoadingStatus,
                             isLocationValid: _isLocationValid,
                           ),
                           const SizedBox(height: 20),
@@ -463,12 +496,23 @@ class _CheckInScreenState extends State<CheckInScreen>
       return;
     }
 
-    final type = _isCheckedIn ? 'check_out' : 'check_in';
+    // Determine action type based on backend status
+    String type;
+    if (_canCheckIn) {
+      type = 'check_in';
+    } else if (_canCheckOut) {
+      type = 'check_out';
+    } else {
+      _showStatusDialog('Anda sudah menyelesaikan absensi hari ini.', isError: false);
+      setState(() {
+        _isPosting = false;
+      });
+      return;
+    }
+
     final now = DateTime.now();
     final dateStr = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
     final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
-
-
 
     // Show loading dialog
     showDialog(
@@ -565,8 +609,12 @@ class _CheckInScreenState extends State<CheckInScreen>
 
       if (!mounted) return;
       final formattedTime = TimeOfDay.now().format(context);
+      
+      // Refresh today's status from backend
+      await _fetchTodayStatus();
+      
+      if (!mounted) return;
       setState(() {
-        _isCheckedIn = !_isCheckedIn;
         _displayTime = formattedTime;
       });
 
