@@ -47,8 +47,6 @@ class _CheckInScreenState extends State<CheckInScreen>
 
   // Shift data from backend
   Shift? _shift;
-  bool _isLoadingShift = true;
-  String? _shiftError;
 
   @override
   void initState() {
@@ -66,26 +64,40 @@ class _CheckInScreenState extends State<CheckInScreen>
   }
 
   Future<void> _fetchShiftData() async {
+    debugPrint('🔍 Starting shift data fetch...');
     final auth = context.read<AuthState>();
     final token = auth.token;
 
     if (token == null) {
-      setState(() {
-        _isLoadingShift = false;
-        _shiftError = 'Token tidak tersedia';
-      });
+      debugPrint('❌ No token available for shift fetch');
       return;
     }
 
     try {
+      debugPrint('📡 Fetching shift from API...');
       final shift = await _api.getShift(token: token);
+
+      debugPrint('=== SHIFT DATA RECEIVED ===');
+      if (shift != null) {
+        debugPrint('✅ Shift loaded successfully');
+        debugPrint('Shift Name: ${shift.name}');
+        debugPrint('Start Time: ${shift.startTime}');
+        debugPrint('End Time: ${shift.endTime}');
+        debugPrint(
+          'Early Check-in Tolerance: ${shift.earlyCheckinTolerance} min',
+        );
+        debugPrint('Max Check-in Hours: ${shift.maxCheckinHours} hours');
+        debugPrint(
+          'Early Check-out Tolerance: ${shift.earlyLeaveTolerance} min',
+        );
+        debugPrint('Max Check-out Hours: ${shift.maxCheckoutHours} hours');
+      } else {
+        debugPrint('⚠️ Shift is null - user has no shift assigned');
+      }
+      debugPrint('===========================');
 
       setState(() {
         _shift = shift;
-        _isLoadingShift = false;
-        if (shift == null) {
-          _shiftError = 'Anda belum memiliki shift';
-        }
       });
 
       // Show dialog if no shift assigned
@@ -94,13 +106,15 @@ class _CheckInScreenState extends State<CheckInScreen>
         if (mounted) {
           _showNoShiftDialog();
         }
+      } else if (shift != null && mounted) {
+        // Validate timing for check-in/check-out
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (mounted) {
+          _validateAttendanceTiming();
+        }
       }
     } catch (e) {
-      debugPrint('Error fetching shift data: $e');
-      setState(() {
-        _isLoadingShift = false;
-        _shiftError = 'Gagal memuat data shift';
-      });
+      debugPrint('❌ Error fetching shift data: $e');
     }
   }
 
@@ -109,7 +123,7 @@ class _CheckInScreenState extends State<CheckInScreen>
     await _validateUserLocation();
   }
 
-  Future<void> _fetchTodayStatus() async {
+  Future<void> _fetchTodayStatus({bool skipDialogs = false}) async {
     final auth = context.read<AuthState>();
     final token = auth.token;
 
@@ -173,6 +187,12 @@ class _CheckInScreenState extends State<CheckInScreen>
       // Check attendance status and show appropriate dialog
       if (!mounted) return;
 
+      // Skip dialogs if requested (e.g., after successful attendance)
+      if (skipDialogs) {
+        debugPrint('Skipping dialog validation as requested');
+        return;
+      }
+
       // Show dialog immediately after setState
       await Future.delayed(
         const Duration(milliseconds: 100),
@@ -192,7 +212,9 @@ class _CheckInScreenState extends State<CheckInScreen>
         debugPrint('Showing not allowed dialog for check_out');
         _showAttendanceNotAllowedDialog('check_out');
       } else {
-        debugPrint('No dialog needed - user can still perform attendance');
+        // Validate timing for early check-in/check-out
+        debugPrint('Validating attendance timing...');
+        _validateAttendanceTiming();
       }
     } catch (e) {
       debugPrint('Error fetching today status: $e');
@@ -200,6 +222,143 @@ class _CheckInScreenState extends State<CheckInScreen>
         _isLoadingStatus = false;
       });
     }
+  }
+
+  void _validateAttendanceTiming() {
+    if (!mounted || _shift == null) return;
+
+    final now = DateTime.now();
+    final shift = _shift!;
+
+    // Get timing boundaries
+    final earlyCheckinTime = shift.getEarlyCheckinTime(now);
+    final earlyCheckoutTime = shift.getEarlyCheckoutTime(now);
+
+    debugPrint('=== TIMING VALIDATION ===');
+    debugPrint('Current Time: ${now.hour}:${now.minute}');
+    debugPrint('Early Check-in Time: ${earlyCheckinTime.hour}:${earlyCheckinTime.minute}');
+    debugPrint('Early Checkout Time: ${earlyCheckoutTime.hour}:${earlyCheckoutTime.minute}');
+    debugPrint('Attendance Status: $_attendanceStatus');
+    debugPrint('Can Check In: $_canCheckIn');
+    debugPrint('Can Check Out: $_canCheckOut');
+    debugPrint('========================');
+
+    // Check if user is trying to check-in too early
+    if (_attendanceStatus == 'not_checked_in' && now.isBefore(earlyCheckinTime)) {
+      debugPrint('⚠️ Too early for check-in!');
+      _showEarlyAttendanceDialog('check_in', earlyCheckinTime);
+      return;
+    }
+
+    // Check if user is trying to check-out too early
+    if (_attendanceStatus == 'checked_in' && now.isBefore(earlyCheckoutTime)) {
+      debugPrint('⚠️ Too early for check-out!');
+      _showEarlyAttendanceDialog('check_out', earlyCheckoutTime);
+      return;
+    }
+
+    debugPrint('✅ Timing is valid for attendance');
+  }
+
+  void _showEarlyAttendanceDialog(String type, DateTime allowedTime) {
+    if (!mounted) return;
+
+    final isCheckIn = type == 'check_in';
+    final title = isCheckIn ? 'Terlalu Cepat untuk Check-in' : 'Terlalu Cepat untuk Check-out';
+    final message = isCheckIn
+        ? 'Anda hanya dapat melakukan check-in mulai pukul ${allowedTime.hour.toString().padLeft(2, '0')}:${allowedTime.minute.toString().padLeft(2, '0')}.\n\nSilakan kembali pada waktu yang tepat.'
+        : 'Anda hanya dapat melakukan check-out mulai pukul ${allowedTime.hour.toString().padLeft(2, '0')}:${allowedTime.minute.toString().padLeft(2, '0')}.\n\nSilakan kembali pada waktu yang tepat.';
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 40,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.schedule_rounded,
+                    size: 40,
+                    color: Color(0xFF2563EB),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111827),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF6B7280),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Kembali ke Home',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showNoShiftDialog() {
@@ -1045,13 +1204,25 @@ class _CheckInScreenState extends State<CheckInScreen>
   }
 
   Future<void> _handleCheckAction() async {
-    if (!mounted || _isPosting) return;
+    debugPrint('🔘 CHECK ACTION BUTTON PRESSED');
+
+    if (!mounted || _isPosting) {
+      debugPrint('⚠️ Action blocked: mounted=$mounted, isPosting=$_isPosting');
+      return;
+    }
+
     setState(() {
       _isPosting = true;
     });
 
+    debugPrint('📌 Shift data status: ${_shift != null ? "LOADED" : "NULL"}');
+    if (_shift != null) {
+      debugPrint('   Shift: ${_shift!.name}');
+    }
+
     final controller = _cameraController;
     if (controller == null || !controller.value.isInitialized) {
+      debugPrint('❌ Camera not ready');
       setState(() {
         _isPosting = false;
       });
@@ -1066,6 +1237,7 @@ class _CheckInScreenState extends State<CheckInScreen>
     final token = auth.token;
     final user = auth.user;
     if (token == null || user == null) {
+      debugPrint('❌ No token or user');
       setState(() {
         _isPosting = false;
       });
@@ -1077,9 +1249,12 @@ class _CheckInScreenState extends State<CheckInScreen>
     String type;
     if (_canCheckIn) {
       type = 'check_in';
+      debugPrint('📍 Action type: CHECK-IN');
     } else if (_canCheckOut) {
       type = 'check_out';
+      debugPrint('📍 Action type: CHECK-OUT');
     } else {
+      debugPrint('❌ No action available (already completed)');
       _showStatusDialog(
         'Anda sudah menyelesaikan absensi hari ini.',
         isError: false,
@@ -1275,8 +1450,8 @@ class _CheckInScreenState extends State<CheckInScreen>
       if (!mounted) return;
       final formattedTime = TimeOfDay.now().format(context);
 
-      // Refresh today's status from backend
-      await _fetchTodayStatus();
+      // Refresh today's status from backend (skip dialogs)
+      await _fetchTodayStatus(skipDialogs: true);
 
       if (!mounted) return;
       setState(() {
@@ -1513,10 +1688,10 @@ class _CheckInScreenState extends State<CheckInScreen>
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
+                      // Close dialog
                       Navigator.of(dialogContext).pop();
-                      if (Navigator.of(context).canPop()) {
-                        Navigator.of(context).pop();
-                      }
+                      // Pop the check-in screen to return to home
+                      Navigator.of(context).pop();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.black,
@@ -1528,7 +1703,7 @@ class _CheckInScreenState extends State<CheckInScreen>
                       elevation: 0,
                     ),
                     child: const Text(
-                      'Continue',
+                      'Kembali ke Home',
                       style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
