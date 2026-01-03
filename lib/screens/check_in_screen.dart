@@ -34,6 +34,7 @@ class _CheckInScreenState extends State<CheckInScreen>
   bool _isLoadingStatus = true;
   final ApiService _api = ApiService();
   Timer? _timer;
+  DateTime? _lastStatusFetchDate; // Track last date status was fetched
 
   // Location validation states
   List<Location> _officeLocations = [];
@@ -75,33 +76,63 @@ class _CheckInScreenState extends State<CheckInScreen>
 
     try {
       final statusData = await _api.getTodayStatus(token: token);
-      final status = statusData['status'] as String? ?? 'not_checked_in';
-      final canCheckIn = statusData['can_check_in'] as bool? ?? false;
-      final canCheckOut = statusData['can_check_out'] as bool? ?? false;
-      
+
+      // Check if the response date matches today's date
+      final responseDate = statusData['date'] as String?;
+      final now = DateTime.now();
+      final todayString =
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      String status;
+      bool canCheckIn;
+      bool canCheckOut;
+
+      if (responseDate != null && responseDate != todayString) {
+        // Response is for a different date, reset to default values
+        debugPrint(
+          '⚠️ Response date ($responseDate) does not match today ($todayString)',
+        );
+        debugPrint('Resetting status to not_checked_in');
+        status = 'not_checked_in';
+        canCheckIn = true; // Assume can check in for new day
+        canCheckOut = false;
+      } else {
+        // Response is for today or no date field, use the response values
+        status = statusData['status'] as String? ?? 'not_checked_in';
+        canCheckIn = statusData['can_check_in'] as bool? ?? false;
+        canCheckOut = statusData['can_check_out'] as bool? ?? false;
+      }
+
       // Debug logging
       debugPrint('=== TODAY STATUS DEBUG ===');
+      debugPrint('Response Date: $responseDate');
+      debugPrint('Today Date: $todayString');
       debugPrint('Status: $status');
       debugPrint('Can Check In: $canCheckIn');
       debugPrint('Can Check Out: $canCheckOut');
       debugPrint('Full Response: $statusData');
       debugPrint('========================');
-      
+
       setState(() {
         _canCheckIn = canCheckIn;
         _canCheckOut = canCheckOut;
         _attendanceStatus = status;
-        _isCheckedIn = _attendanceStatus == 'checked_in' || _attendanceStatus == 'completed';
+        _isCheckedIn =
+            _attendanceStatus == 'checked_in' ||
+            _attendanceStatus == 'completed';
         _isLoadingStatus = false;
+        _lastStatusFetchDate = DateTime.now(); // Save fetch date
       });
 
       // Check attendance status and show appropriate dialog
       if (!mounted) return;
-      
+
       // Show dialog immediately after setState
-      await Future.delayed(const Duration(milliseconds: 100)); // Small delay for UI to settle
+      await Future.delayed(
+        const Duration(milliseconds: 100),
+      ); // Small delay for UI to settle
       if (!mounted) return;
-      
+
       if (status == 'completed') {
         // Already completed both check-in and check-out today
         debugPrint('Showing completed dialog');
@@ -127,7 +158,7 @@ class _CheckInScreenState extends State<CheckInScreen>
 
   void _showAttendanceCompletedDialog() {
     if (!mounted) return;
-    
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -221,9 +252,9 @@ class _CheckInScreenState extends State<CheckInScreen>
 
   void _showAttendanceNotAllowedDialog(String type) {
     if (!mounted) return;
-    
+
     final isCheckIn = type == 'check_in';
-    
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -408,10 +439,12 @@ class _CheckInScreenState extends State<CheckInScreen>
         if (isValid) {
           _locationStatus = 'Lokasi valid ✓';
           _locationWarning = null;
-          _hasShownLocationWarning = false; // Reset flag when location becomes valid
+          _hasShownLocationWarning =
+              false; // Reset flag when location becomes valid
         } else {
           _locationStatus = 'Lokasi tidak valid';
-          _locationWarning = 'Anda tidak berada di lokasi kerja. Jarak dari ${nearestLocation?.name ?? "kantor"}: ${minDistance.toStringAsFixed(0)} meter';
+          _locationWarning =
+              'Anda tidak berada di lokasi kerja. Jarak dari ${nearestLocation?.name ?? "kantor"}: ${minDistance.toStringAsFixed(0)} meter';
         }
       });
 
@@ -419,7 +452,6 @@ class _CheckInScreenState extends State<CheckInScreen>
       if (!isValid) {
         _showLocationWarning();
       }
-
     } catch (e) {
       debugPrint('Error validating user location: $e');
       setState(() {
@@ -430,12 +462,21 @@ class _CheckInScreenState extends State<CheckInScreen>
     }
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const double earthRadius = 6371000; // Radius bumi dalam meter
     final double dLat = (lat2 - lat1) * pi / 180;
     final double dLon = (lon2 - lon1) * pi / 180;
-    final double a = sin(dLat / 2) * sin(dLat / 2) +
-        cos(lat1 * pi / 180) * cos(lat2 * pi / 180) * sin(dLon / 2) * sin(dLon / 2);
+    final double a =
+        sin(dLat / 2) * sin(dLat / 2) +
+        cos(lat1 * pi / 180) *
+            cos(lat2 * pi / 180) *
+            sin(dLon / 2) *
+            sin(dLon / 2);
     final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
     return earthRadius * c;
   }
@@ -492,9 +533,22 @@ class _CheckInScreenState extends State<CheckInScreen>
     _timer?.cancel();
     super.dispose();
   }
+
   void _updateTime() {
     final now = DateTime.now();
     final formatted = TimeOfDay.fromDateTime(now).format(context);
+
+    // Check if day has changed since last status fetch
+    final lastFetchDate = _lastStatusFetchDate;
+    if (lastFetchDate != null &&
+        (now.year != lastFetchDate.year ||
+            now.month != lastFetchDate.month ||
+            now.day != lastFetchDate.day)) {
+      debugPrint('Day changed during timer, refreshing status...');
+      _fetchTodayStatus();
+      _validateUserLocation();
+    }
+
     setState(() {
       _displayTime = formatted;
     });
@@ -505,6 +559,19 @@ class _CheckInScreenState extends State<CheckInScreen>
     final controller = _cameraController;
 
     if (state == AppLifecycleState.resumed) {
+      // Check if day has changed and refresh status
+      final now = DateTime.now();
+      final lastFetchDate = _lastStatusFetchDate;
+
+      if (lastFetchDate == null ||
+          now.year != lastFetchDate.year ||
+          now.month != lastFetchDate.month ||
+          now.day != lastFetchDate.day) {
+        debugPrint('Day changed or first load, refreshing status...');
+        _fetchTodayStatus();
+        _validateUserLocation();
+      }
+
       if (controller == null) {
         _initializeCamera();
       }
@@ -685,7 +752,8 @@ class _CheckInScreenState extends State<CheckInScreen>
                               setState(() {
                                 _isCheckingLocation = true;
                                 _locationWarning = null;
-                                _hasShownLocationWarning = false; // Reset warning flag
+                                _hasShownLocationWarning =
+                                    false; // Reset warning flag
                               });
                               _validateUserLocation();
                             },
@@ -712,7 +780,10 @@ class _CheckInScreenState extends State<CheckInScreen>
 
     final controller = _cameraController;
     if (controller == null || !controller.value.isInitialized) {
-      _showStatusDialog('Kamera belum siap untuk mengambil foto.', isError: true);
+      _showStatusDialog(
+        'Kamera belum siap untuk mengambil foto.',
+        isError: true,
+      );
       return;
     }
 
@@ -731,7 +802,10 @@ class _CheckInScreenState extends State<CheckInScreen>
     } else if (_canCheckOut) {
       type = 'check_out';
     } else {
-      _showStatusDialog('Anda sudah menyelesaikan absensi hari ini.', isError: false);
+      _showStatusDialog(
+        'Anda sudah menyelesaikan absensi hari ini.',
+        isError: false,
+      );
       setState(() {
         _isPosting = false;
       });
@@ -739,8 +813,10 @@ class _CheckInScreenState extends State<CheckInScreen>
     }
 
     final now = DateTime.now();
-    final dateStr = '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-    final timeStr = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final timeStr =
+        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
 
     // Show loading dialog
     showDialog(
@@ -837,21 +913,27 @@ class _CheckInScreenState extends State<CheckInScreen>
 
       if (!mounted) return;
       final formattedTime = TimeOfDay.now().format(context);
-      
+
       // Refresh today's status from backend
       await _fetchTodayStatus();
-      
+
       if (!mounted) return;
       setState(() {
         _displayTime = formattedTime;
       });
 
       Navigator.of(context, rootNavigator: true).pop(); // Close loading dialog
-      _showSuccessDialog(type == 'check_in' ? 'Check-In' : 'Check-Out', formattedTime);
+      _showSuccessDialog(
+        type == 'check_in' ? 'Check-In' : 'Check-Out',
+        formattedTime,
+      );
     } on CameraException catch (e) {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
-      _showStatusDialog('Gagal mengambil foto: ${e.description ?? e.code}', isError: true);
+      _showStatusDialog(
+        'Gagal mengambil foto: ${e.description ?? e.code}',
+        isError: true,
+      );
     } on HttpException catch (e) {
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop();
@@ -861,7 +943,8 @@ class _CheckInScreenState extends State<CheckInScreen>
           'Wajah tidak terdeteksi pada foto yang diambil.\n\nPastikan wajah Anda jelas terlihat di dalam frame dan tidak terhalang. Silakan coba lagi.',
           isError: true,
         );
-      } else if (msg.contains('tidak diperbolehkan') || msg.contains('Maksimal')) {
+      } else if (msg.contains('tidak diperbolehkan') ||
+          msg.contains('Maksimal')) {
         // Handle maximum check-in/check-out hours validation errors
         _showStatusDialog(
           msg,
@@ -886,7 +969,8 @@ class _CheckInScreenState extends State<CheckInScreen>
           'Wajah tidak terdeteksi pada foto yang diambil.\n\nPastikan wajah Anda jelas terlihat di dalam frame dan tidak terhalang. Silakan coba lagi.',
           isError: true,
         );
-      } else if (msg.contains('tidak diperbolehkan') || msg.contains('Maksimal')) {
+      } else if (msg.contains('tidak diperbolehkan') ||
+          msg.contains('Maksimal')) {
         // Handle maximum check-in/check-out hours validation errors
         _showStatusDialog(
           msg,
@@ -911,7 +995,11 @@ class _CheckInScreenState extends State<CheckInScreen>
     }
   }
 
-  void _showStatusDialog(String message, {bool isError = false, String? title}) {
+  void _showStatusDialog(
+    String message, {
+    bool isError = false,
+    String? title,
+  }) {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -936,9 +1024,13 @@ class _CheckInScreenState extends State<CheckInScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  isError ? Icons.error_outline_rounded : Icons.info_outline_rounded,
+                  isError
+                      ? Icons.error_outline_rounded
+                      : Icons.info_outline_rounded,
                   size: 48,
-                  color: isError ? const Color(0xFFEF4444) : const Color(0xFF6366F1),
+                  color: isError
+                      ? const Color(0xFFEF4444)
+                      : const Color(0xFF6366F1),
                 ),
                 const SizedBox(height: 18),
                 if (title != null) ...[
@@ -958,7 +1050,9 @@ class _CheckInScreenState extends State<CheckInScreen>
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: title != null ? 14 : 16,
-                    fontWeight: title != null ? FontWeight.w500 : FontWeight.w600,
+                    fontWeight: title != null
+                        ? FontWeight.w500
+                        : FontWeight.w600,
                     color: const Color(0xFF111827),
                   ),
                 ),
@@ -970,7 +1064,9 @@ class _CheckInScreenState extends State<CheckInScreen>
                       Navigator.of(dialogContext).pop();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isError ? const Color(0xFFEF4444) : const Color(0xFF6366F1),
+                      backgroundColor: isError
+                          ? const Color(0xFFEF4444)
+                          : const Color(0xFF6366F1),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
@@ -980,7 +1076,10 @@ class _CheckInScreenState extends State<CheckInScreen>
                     ),
                     child: const Text(
                       'Tutup',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
@@ -1470,7 +1569,9 @@ class _CheckActionButton extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        splashColor: forceDisable ? Colors.transparent : const Color(0xFF6366F1).withValues(alpha: 0.12),
+        splashColor: forceDisable
+            ? Colors.transparent
+            : const Color(0xFF6366F1).withValues(alpha: 0.12),
         highlightColor: Colors.transparent,
         onTap: forceDisable ? null : () => onTap?.call(),
         child: Opacity(
@@ -1519,8 +1620,8 @@ class _CheckActionButton extends StatelessWidget {
                       forceDisable && !isLocationValid
                           ? 'Lokasi tidak valid'
                           : isCheckedIn
-                              ? 'Tap to Check-Out'
-                              : 'Tap to Absen',
+                          ? 'Tap to Check-Out'
+                          : 'Tap to Absen',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -1605,8 +1706,8 @@ class _LocationCard extends StatelessWidget {
                     colors: isCheckingLocation
                         ? [Colors.blue, Colors.blue.shade700]
                         : isLocationValid
-                            ? [const Color(0xFF10B981), const Color(0xFF059669)]
-                            : [const Color(0xFFF59E0B), const Color(0xFFD97706)],
+                        ? [const Color(0xFF10B981), const Color(0xFF059669)]
+                        : [const Color(0xFFF59E0B), const Color(0xFFD97706)],
                   ),
                 ),
                 child: isCheckingLocation
@@ -1615,7 +1716,9 @@ class _LocationCard extends StatelessWidget {
                         height: 20,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
                         ),
                       )
                     : Icon(
@@ -1645,8 +1748,8 @@ class _LocationCard extends StatelessWidget {
                         color: isCheckingLocation
                             ? Colors.blue
                             : isLocationValid
-                                ? const Color(0xFF059669)
-                                : const Color(0xFFD97706),
+                            ? const Color(0xFF059669)
+                            : const Color(0xFFD97706),
                       ),
                     ),
                     if (locationWarning != null) ...[
@@ -1685,16 +1788,16 @@ class _LocationCard extends StatelessWidget {
                         colors: [Color(0xFFDCEBFF), Color(0xFFEFF6FF)],
                       )
                     : isLocationValid
-                        ? const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFFD1FAE5), Color(0xFFF0F9FF)],
-                          )
-                        : const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFFFDF2E0), Color(0xFFFFF8E1)],
-                          ),
+                    ? const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFD1FAE5), Color(0xFFF0F9FF)],
+                      )
+                    : const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFFFDF2E0), Color(0xFFFFF8E1)],
+                      ),
               ),
               child: Stack(
                 alignment: Alignment.center,
@@ -1704,12 +1807,13 @@ class _LocationCard extends StatelessWidget {
                     width: 128,
                     height: 128,
                     decoration: BoxDecoration(
-                      color: (isCheckingLocation
-                              ? Colors.blue
-                              : isLocationValid
+                      color:
+                          (isCheckingLocation
+                                  ? Colors.blue
+                                  : isLocationValid
                                   ? const Color(0xFF10B981)
                                   : const Color(0xFFF59E0B))
-                          .withValues(alpha: 0.12),
+                              .withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1717,12 +1821,13 @@ class _LocationCard extends StatelessWidget {
                     width: 78,
                     height: 78,
                     decoration: BoxDecoration(
-                      color: (isCheckingLocation
-                              ? Colors.blue
-                              : isLocationValid
+                      color:
+                          (isCheckingLocation
+                                  ? Colors.blue
+                                  : isLocationValid
                                   ? const Color(0xFF10B981)
                                   : const Color(0xFFF59E0B))
-                          .withValues(alpha: 0.18),
+                              .withValues(alpha: 0.18),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -1733,17 +1838,18 @@ class _LocationCard extends StatelessWidget {
                       color: isCheckingLocation
                           ? Colors.blue
                           : isLocationValid
-                              ? const Color(0xFF10B981)
-                              : const Color(0xFFF59E0B),
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFF59E0B),
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: (isCheckingLocation
-                                  ? Colors.blue
-                                  : isLocationValid
+                          color:
+                              (isCheckingLocation
+                                      ? Colors.blue
+                                      : isLocationValid
                                       ? const Color(0xFF10B981)
                                       : const Color(0xFFF59E0B))
-                              .withValues(alpha: 0.3),
+                                  .withValues(alpha: 0.3),
                           blurRadius: 20,
                         ),
                       ],
@@ -1754,11 +1860,15 @@ class _LocationCard extends StatelessWidget {
                             height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : Icon(
-                            isLocationValid ? Icons.check_circle : Icons.warning,
+                            isLocationValid
+                                ? Icons.check_circle
+                                : Icons.warning,
                             color: Colors.white,
                             size: 20,
                           ),
