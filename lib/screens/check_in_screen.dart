@@ -49,8 +49,9 @@ class _CheckInScreenState extends State<CheckInScreen>
     WidgetsBinding.instance.addObserver(this);
     _initializeCamera();
     _initializeLocationValidation();
-    _fetchTodayStatus();
+    // Delay status check to ensure context is ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchTodayStatus();
       _updateTime();
       _timer = Timer.periodic(const Duration(seconds: 1), (_) => _updateTime());
     });
@@ -74,19 +75,246 @@ class _CheckInScreenState extends State<CheckInScreen>
 
     try {
       final statusData = await _api.getTodayStatus(token: token);
+      final status = statusData['status'] as String? ?? 'not_checked_in';
+      final canCheckIn = statusData['can_check_in'] as bool? ?? false;
+      final canCheckOut = statusData['can_check_out'] as bool? ?? false;
+      
+      // Debug logging
+      debugPrint('=== TODAY STATUS DEBUG ===');
+      debugPrint('Status: $status');
+      debugPrint('Can Check In: $canCheckIn');
+      debugPrint('Can Check Out: $canCheckOut');
+      debugPrint('Full Response: $statusData');
+      debugPrint('========================');
+      
       setState(() {
-        _canCheckIn = statusData['can_check_in'] as bool? ?? false;
-        _canCheckOut = statusData['can_check_out'] as bool? ?? false;
-        _attendanceStatus = statusData['status'] as String? ?? 'not_checked_in';
+        _canCheckIn = canCheckIn;
+        _canCheckOut = canCheckOut;
+        _attendanceStatus = status;
         _isCheckedIn = _attendanceStatus == 'checked_in' || _attendanceStatus == 'completed';
         _isLoadingStatus = false;
       });
+
+      // Check attendance status and show appropriate dialog
+      if (!mounted) return;
+      
+      // Show dialog immediately after setState
+      await Future.delayed(const Duration(milliseconds: 100)); // Small delay for UI to settle
+      if (!mounted) return;
+      
+      if (status == 'completed') {
+        // Already completed both check-in and check-out today
+        debugPrint('Showing completed dialog');
+        _showAttendanceCompletedDialog();
+      } else if (status == 'not_checked_in' && !canCheckIn) {
+        // Not checked in yet but can't check in anymore (past maximum time)
+        debugPrint('Showing not allowed dialog for check_in');
+        _showAttendanceNotAllowedDialog('check_in');
+      } else if (status == 'checked_in' && !canCheckOut) {
+        // Already checked in but can't check out anymore (past maximum time)
+        debugPrint('Showing not allowed dialog for check_out');
+        _showAttendanceNotAllowedDialog('check_out');
+      } else {
+        debugPrint('No dialog needed - user can still perform attendance');
+      }
     } catch (e) {
       debugPrint('Error fetching today status: $e');
       setState(() {
         _isLoadingStatus = false;
       });
     }
+  }
+
+  void _showAttendanceCompletedDialog() {
+    if (!mounted) return;
+    
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 40,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF22C55E).withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_rounded,
+                    size: 40,
+                    color: Color(0xFF16A34A),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Absensi Sudah Selesai',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Anda sudah menyelesaikan check-in dan check-out untuk hari ini.\n\nSampai jumpa besok!',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF6B7280),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF16A34A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Kembali ke Home',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showAttendanceNotAllowedDialog(String type) {
+    if (!mounted) return;
+    
+    final isCheckIn = type == 'check_in';
+    
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            padding: const EdgeInsets.all(28),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 40,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF59E0B).withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.access_time_rounded,
+                    size: 40,
+                    color: Color(0xFFD97706),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Waktu Absensi Terlewat',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  isCheckIn
+                      ? 'Waktu untuk check-in hari ini sudah terlewat.\n\nSilakan hubungi admin untuk informasi lebih lanjut.'
+                      : 'Waktu untuk check-out hari ini sudah terlewat.\n\nSilakan hubungi admin untuk informasi lebih lanjut.',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF6B7280),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(dialogContext).pop();
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFD97706),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Kembali ke Home',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _fetchOfficeLocations() async {
@@ -633,6 +861,19 @@ class _CheckInScreenState extends State<CheckInScreen>
           'Wajah tidak terdeteksi pada foto yang diambil.\n\nPastikan wajah Anda jelas terlihat di dalam frame dan tidak terhalang. Silakan coba lagi.',
           isError: true,
         );
+      } else if (msg.contains('tidak diperbolehkan') || msg.contains('Maksimal')) {
+        // Handle maximum check-in/check-out hours validation errors
+        _showStatusDialog(
+          msg,
+          isError: true,
+          title: 'Waktu Absensi Tidak Valid',
+        );
+      } else if (msg.contains('Face not matched')) {
+        _showStatusDialog(
+          'Wajah tidak cocok dengan data yang terdaftar.\n\nPastikan wajah Anda yang terdaftar untuk akun ini.',
+          isError: true,
+          title: 'Verifikasi Wajah Gagal',
+        );
       } else {
         _showStatusDialog('Gagal kirim absen: $msg', isError: true);
       }
@@ -644,6 +885,19 @@ class _CheckInScreenState extends State<CheckInScreen>
         _showStatusDialog(
           'Wajah tidak terdeteksi pada foto yang diambil.\n\nPastikan wajah Anda jelas terlihat di dalam frame dan tidak terhalang. Silakan coba lagi.',
           isError: true,
+        );
+      } else if (msg.contains('tidak diperbolehkan') || msg.contains('Maksimal')) {
+        // Handle maximum check-in/check-out hours validation errors
+        _showStatusDialog(
+          msg,
+          isError: true,
+          title: 'Waktu Absensi Tidak Valid',
+        );
+      } else if (msg.contains('Face not matched')) {
+        _showStatusDialog(
+          'Wajah tidak cocok dengan data yang terdaftar.\n\nPastikan wajah Anda yang terdaftar untuk akun ini.',
+          isError: true,
+          title: 'Verifikasi Wajah Gagal',
         );
       } else {
         _showStatusDialog('Gagal kirim absen: $msg', isError: true);
@@ -657,7 +911,7 @@ class _CheckInScreenState extends State<CheckInScreen>
     }
   }
 
-  void _showStatusDialog(String message, {bool isError = false}) {
+  void _showStatusDialog(String message, {bool isError = false, String? title}) {
     showDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -687,10 +941,26 @@ class _CheckInScreenState extends State<CheckInScreen>
                   color: isError ? const Color(0xFFEF4444) : const Color(0xFF6366F1),
                 ),
                 const SizedBox(height: 18),
+                if (title != null) ...[
+                  Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 Text(
                   message,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF111827)),
+                  style: TextStyle(
+                    fontSize: title != null ? 14 : 16,
+                    fontWeight: title != null ? FontWeight.w500 : FontWeight.w600,
+                    color: const Color(0xFF111827),
+                  ),
                 ),
                 const SizedBox(height: 24),
                 SizedBox(
